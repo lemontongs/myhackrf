@@ -16,10 +16,10 @@ all: %(EXECUTABLE)
 	$(CXX) $(LDFLAGS) -o $(EXECUTABLE) $(OBJS) $(LDLIBS)
 
 %.o: %.cpp
-	$(CXX) $(CFLAGS) $(CXXFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) -c $<
 
 clean:
 	$(RM) $(OBJS)
 
-dist-clean: clean
-	$(RM) tool
+distclean: clean
+	$(RM) $(EXECUTABLE)
