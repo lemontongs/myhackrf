@@ -4,7 +4,7 @@
 #include <QDebug>
 #include <QColor>
 #include <qwt_symbol.h>
-
+#include <math.h>
 #include <fftw3.h>
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -47,7 +47,7 @@ MainWindow::MainWindow(QWidget *parent) :
     d_curve.setStyle( QwtPlotCurve::Lines );
     d_curve.attach(p);
 
-    this->setCentralWidget( p );
+    ui->gridLayout->addWidget( p, 1, 0, 1, 3 );
 
     emit startReceivingPackets();
 }
@@ -92,8 +92,12 @@ void MainWindow::handleNewPacket(QByteArray packet)
         if (ii >= (N/2))
             idx = ii - (N/2);
 
-        //qDebug() << N << " " << ii << " " << idx;
-        data[ii] = QPointF(freq_bins_mhz[ii],out[idx][0]);
+        double val = abs(out[idx][0]);
+        if (0 != val)
+            val = 20*log10(val);
+
+        //qDebug() << abs(out[idx][0]) << " " << log10(abs(out[idx][0])) << " " << 20*log10(abs(out[idx][0]));
+        data[ii] = QPointF(freq_bins_mhz[ii], val);
     }
 
     fftw_destroy_plan(my_plan);
