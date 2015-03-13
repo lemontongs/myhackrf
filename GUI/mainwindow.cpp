@@ -89,10 +89,10 @@ void MainWindow::handleNewPacket(QByteArray packet)
     for (int ii = 0; ii < N; ii++)
     {
         int idx = ii+(N/2); // This effectively does an fftshift
-        if (ii >= N)
-            idx = idx - N;
+        if (ii >= (N/2))
+            idx = ii - (N/2);
 
-        qDebug() << idx;
+        //qDebug() << N << " " << ii << " " << idx;
         data[ii] = QPointF(freq_bins_mhz[ii],out[idx][0]);
     }
 

@@ -1,4 +1,9 @@
 *.user
+*.o
+moc_*.cpp
+ui_*.h
 qwt-6.1.2
+GUI
+Makefile
 
 
