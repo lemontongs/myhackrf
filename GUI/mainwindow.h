@@ -27,9 +27,13 @@ public slots:
 signals:
     void startReceivingPackets(void);
 
+private slots:
+    void on_pushButton_clicked();
+
 private:
 
     void closeEvent(QCloseEvent *event);
+    void calculateFrequencyBins(int N, double fs, u_int64_t fc);
 
     Ui::MainWindow *ui;
 
@@ -40,6 +44,7 @@ private:
     QwtPlot * p;
 
     QVector<QPointF> data;
+    int num_fft_bins;
     std::vector<double> freq_bins_mhz;
 };
 

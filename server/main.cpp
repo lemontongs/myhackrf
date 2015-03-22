@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <iostream>
+#include <string>
 #include <vector>
 
 hackrf_device* device = NULL;
@@ -61,25 +62,81 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
 //
 // Handle received message. Return false to exit main loop.
 //
-bool process_message( std::string & message )
+uint64_t fc_hz    = 433900000; // center freq
+double   fs_hz    = 1000000;   // sample rate
+uint32_t lna_gain = 40;        // gain
+
+bool process_messages( zmq::socket_t & comm_sock )
 {
-    std::cout << "Received: '" << message << "'" << std::endl;
-
-    std::vector<std::string> fields;
-    std::string temp;
-    std::stringstream s( message );
-    while( s >> temp )
-        fields.push_back( temp );
-
-    if ( fields.size() < 1 )
-        return true;
-
-    if ( fields[0] == "quit" )
-        return false;
-    if ( fields[0] == "tune" )
+    while (1)
     {
-        if ( fields.size() >= 2 )
-            std::cout << "tuning to: " << fields[1] << std::endl;
+        std::string message = s_recv( comm_sock );
+        
+        std::cout << "Received: '" << message << "'" << std::endl;
+
+        std::vector<std::string> fields;
+        std::string temp;
+        std::stringstream s( message );
+        while( s >> temp )
+            fields.push_back( temp );
+
+        if ( fields.size() < 1 )
+        {
+            s_send( comm_sock, std::string("ERROR: invalid request") );
+            continue;
+        }
+        
+        // GET
+        if ( fields[0] == "get-fc" )
+        {
+            std::stringstream ss;
+            ss << fc_hz;
+            s_send( comm_sock, ss.str() );
+            continue;
+        }
+        
+        if ( fields[0] == "get-fs" )
+        {
+            std::stringstream ss;
+            ss << fs_hz;
+            s_send( comm_sock, ss.str() );
+            continue;
+        }
+        if ( fields[0] == "get-gain" )
+        {
+            std::stringstream ss;
+            ss << lna_gain;
+            s_send( comm_sock, ss.str() );
+            continue;
+        }
+        
+        
+        // ACTIONS
+        if ( fields[0] == "quit" )
+        {
+            s_send( comm_sock, std::string("OK") );
+            return false;
+        }
+        
+        if ( fields[0] == "tune" && fields.size() >= 2 )
+        {
+            std::istringstream ss(fields[1]);
+            uint64_t new_fc_hz;
+            if (!(ss >> new_fc_hz))
+            {
+                std::cout << "tune failed: '" << fields[1] << "'" << std::endl;
+                s_send( comm_sock, std::string("ERROR: invalid tune argument") );
+            }
+            else if ( check_error( hackrf_set_freq( device, new_fc_hz ) ) )
+            {
+                std::cout << "tuned to: " << new_fc_hz << std::endl;
+                fc_hz = new_fc_hz;
+                s_send( comm_sock, std::string("OK") );
+            }
+            else
+                s_send( comm_sock, std::string("ERROR: tune failed") );
+            continue;
+        }
     }
 }
 
@@ -121,15 +178,15 @@ int main()
             read_partid_serialno.serial_no[3]);
 
     std::cout << "Tuning..." << std::endl;
-    if ( ! check_error( hackrf_set_freq( device, 433900000 ) ) )
+    if ( ! check_error( hackrf_set_freq( device, fc_hz ) ) )
         return EXIT_FAILURE;
 
     std::cout << "Setting sample rate..." << std::endl;
-    if ( ! check_error( hackrf_set_sample_rate( device, 1000000 ) ) )
+    if ( ! check_error( hackrf_set_sample_rate( device, fs_hz ) ) )
         return EXIT_FAILURE;
 
     std::cout << "Setting gain..." << std::endl;
-    if ( ! check_error( hackrf_set_lna_gain( device, 40 ) ) )
+    if ( ! check_error( hackrf_set_lna_gain( device, lna_gain ) ) )
         return EXIT_FAILURE;
 
     // Setup the interrupt signal handler
@@ -153,10 +210,8 @@ int main()
     if ( ! check_error( hackrf_start_rx( device, sample_block_cb_fn, (void*)(&publisher) ) ) )
         return EXIT_FAILURE;
 
-    //  Wait for next request from client
-    std::string msg = s_recv(receiver);
-    while ( process_message( msg ) )
-        (void)0;
+    // Listen for messages, this blocks until a "quit" is received
+    process_messages(receiver);
 
     // Release the device
     cleanup();
