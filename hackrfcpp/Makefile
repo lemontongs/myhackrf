@@ -1,13 +1,13 @@
 
 
-EXECUTABLE=hackrf_server
+EXECUTABLE=object_test
 
-CXXFLAGS=-I/usr/local/include/libhackrf/ -I../hackrfcpp/
-LDLIBS=-lhackrf -lzmq
+CXXFLAGS=-I/usr/local/include/libhackrf/
+LDLIBS=-lhackrf
 #LDFLAGS=-L./
-CXX=g++
+CXX=g++ 
 
-SRCS=../hackrfcpp/HackRFDevice.cpp main.cpp
+SRCS=HackRFDevice.cpp main.cpp
 OBJS=$(subst .cpp,.o,$(SRCS))
 
 all: %(EXECUTABLE)
@@ -16,7 +16,7 @@ all: %(EXECUTABLE)
 	$(CXX) $(LDFLAGS) -o $(EXECUTABLE) $(OBJS) $(LDLIBS)
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -c $<
 
 clean:
 	$(RM) $(OBJS)

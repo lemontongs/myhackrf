@@ -1,9 +1,9 @@
 
 
-EXECUTABLE=hackrf_server
+EXECUTABLE=freq_monitor
 
 CXXFLAGS=-I/usr/local/include/libhackrf/ -I../hackrfcpp/
-LDLIBS=-lhackrf -lzmq
+LDLIBS=-lzmq -lhackrf -lfftw3
 #LDFLAGS=-L./
 CXX=g++
 

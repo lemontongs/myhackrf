@@ -12,6 +12,11 @@
 #define PI 3.14159265
 
 hackrf_device* device = NULL;
+uint64_t fc_hz      = 462610000; // center freq
+double   fs_hz      = 1000000;   // sample rate
+uint32_t lna_gain   = 0;
+uint8_t  amp_enable = 0;
+uint32_t txvga_gain = 0;
 
 //
 // Check for hackrf error message
@@ -54,7 +59,7 @@ void signal_handler(int s)
 double t = 0.0;
 double dt = 1/1000000.0;
 bool print_signal = true;
-double df = 10000;
+double df = 1000;
 int sample_block_cb_fn(hackrf_transfer* transfer)
 {
     for (int ii = 0; ii < transfer->valid_length; ii+=2)
@@ -72,9 +77,10 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
         if ( t >= 1.0 )
         {
             t = 0.0;
-            df = -df;
         }
     }
+    
+    df = -df;
     
     return 0;
 }
@@ -118,23 +124,23 @@ int main()
             read_partid_serialno.serial_no[3]);
 
     std::cout << "Tuning..." << std::endl;
-    if ( ! check_error( hackrf_set_freq( device, 905000000 ) ) )
+    if ( ! check_error( hackrf_set_freq( device, fc_hz ) ) )
         return EXIT_FAILURE;
 
     std::cout << "Setting sample rate..." << std::endl;
-    if ( ! check_error( hackrf_set_sample_rate( device, 1000000 ) ) )
+    if ( ! check_error( hackrf_set_sample_rate( device, fs_hz ) ) )
         return EXIT_FAILURE;
 
     std::cout << "Setting gain..." << std::endl;
-    if ( ! check_error( hackrf_set_lna_gain( device, 0 ) ) )
+    if ( ! check_error( hackrf_set_lna_gain( device, lna_gain ) ) )
         return EXIT_FAILURE;
 
     std::cout << "Disabling amp..." << std::endl;
-    if ( ! check_error( hackrf_set_amp_enable( device, 0 ) ) )
+    if ( ! check_error( hackrf_set_amp_enable( device, amp_enable ) ) )
         return EXIT_FAILURE;
 
     std::cout << "Disabling txvga..." << std::endl;
-    if ( ! check_error( hackrf_set_txvga_gain( device, 0 ) ) )
+    if ( ! check_error( hackrf_set_txvga_gain( device, txvga_gain ) ) )
         return EXIT_FAILURE;
 
 
@@ -145,7 +151,7 @@ int main()
     sigIntHandler.sa_flags = 0;
     sigaction(SIGINT, &sigIntHandler, NULL);
 
-    // Start receiving data
+    // Start transmitting data
     std::cout << "Starting Tx" << std::endl;
     if ( ! check_error( hackrf_start_tx( device, sample_block_cb_fn, (void*)(NULL) ) ) )
         return EXIT_FAILURE;
