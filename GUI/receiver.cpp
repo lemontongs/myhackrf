@@ -7,8 +7,14 @@
 Receiver::Receiver()
 {
     isRunning = false;
+    isInitialized = false;
     data_target = "tcp://192.168.1.174:5555";
     comm_target = "tcp://192.168.1.174:5556";
+}
+
+void Receiver::initialize()
+{
+    isInitialized = true;
 
     // Setup the data receiver
     comm_context = new zmq::context_t(1);
@@ -36,6 +42,9 @@ void Receiver::updateParameters()
     std::stringstream ss2(s_recv(*comm_socket));
     ss2 >> fs_hz;
     qDebug() << "Got: " << fs_hz;
+
+    emit newParameters(double(fc_hz), fs_hz);
+    qDebug() << "Emitting new parameters";
 }
 
 void Receiver::receivePackets()
@@ -60,14 +69,22 @@ void Receiver::receivePackets()
         }
     }
 
-    // Send quit message
-
+    isInitialized = false;
 }
 
 
 void Receiver::tune(u_int64_t fc_hz)
 {
-    QString command = QString("tune ") + QString::number(fc_hz);
+    QString command = QString("set-fc ") + QString::number(fc_hz);
+    s_send(*comm_socket, command.toStdString());
+    std::string response = s_recv(*comm_socket);
+
+    updateParameters();
+}
+
+void Receiver::setSampleRate(double fs_hz)
+{
+    QString command = QString("set-fs ") + QString::number(fs_hz);
     s_send(*comm_socket, command.toStdString());
     std::string response = s_recv(*comm_socket);
 

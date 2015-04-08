@@ -13,11 +13,15 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    num_fft_bins = 2048;
+
+    connect(&m_receiver, SIGNAL(newParameters(double,double)), this, SLOT(handleNewParameters(double,double)));
     connect(&m_receiver, SIGNAL(newPacket(QByteArray)), this, SLOT(handleNewPacket(QByteArray)), Qt::QueuedConnection);
     connect(&m_receiveThread, SIGNAL(finished()), &m_receiveThread, SLOT(deleteLater()));
     connect(this, SIGNAL(startReceivingPackets()), &m_receiver, SLOT(receivePackets()));
     connect(this, SIGNAL(destroyed()), &m_receiver, SLOT(stop()));
 
+    m_receiver.initialize();
     m_receiver.moveToThread(&m_receiveThread);
     m_receiveThread.start();
 
@@ -26,18 +30,12 @@ MainWindow::MainWindow(QWidget *parent) :
     //
     p = new QwtPlot();
     p->setAutoReplot(true);
-    //p->setAxisAutoScale(0,false);
-    //p->setAxisScale(0, -1.0, 1.0);
-
-    num_fft_bins = 2048;
-
-    calculateFrequencyBins( num_fft_bins, 0, 433900000 );
 
     d_curve.setPen( Qt::blue );
     d_curve.setStyle( QwtPlotCurve::Lines );
     d_curve.attach(p);
 
-    ui->gridLayout->addWidget( p, 1, 0, 1, 3 );
+    ui->gridLayout->addWidget( p, 2, 0, 1, 3 );
 
     emit startReceivingPackets();
 }
@@ -64,14 +62,18 @@ void MainWindow::calculateFrequencyBins(int N, double fs, u_int64_t fc)
     // f = f*fs/N;
     // f = f + fc;
     // f = f / 1e6;
-    N = 262144;
-    fs = double(1000000.0);
     double fs_over_N = double(fs)/double(N);
     freq_bins_mhz.clear();
-    for (int ii = (-N/2); ii < ((N/2)-1); ii++)
+    for (int ii = (-N/2); ii < (N/2); ii++)
         freq_bins_mhz.push_back( ( ii * fs_over_N + fc ) / double(1e6) );
 }
 
+void MainWindow::handleNewParameters(double fc_hz, double fs_hz)
+{
+    qDebug() << "Got new parameters " << num_fft_bins << " " << fc_hz << " " << fs_hz;
+    calculateFrequencyBins( num_fft_bins, fs_hz, u_int64_t(fc_hz) );
+    ui->doubleSpinBox->setValue(fc_hz/1e6);
+}
 
 void MainWindow::handleNewPacket(QByteArray packet)
 {
@@ -91,6 +93,8 @@ void MainWindow::handleNewPacket(QByteArray packet)
     my_plan = fftw_plan_dft_1d(num_fft_bins, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
     fftw_execute(my_plan);
 
+    double val_sum = 0.0;
+    double val_max = -1000.0;
     data.resize(num_fft_bins);
     for (int ii = 0; ii < num_fft_bins; ii++)
     {
@@ -98,13 +102,20 @@ void MainWindow::handleNewPacket(QByteArray packet)
         if (ii >= (num_fft_bins/2))
             idx = ii - (num_fft_bins/2);
 
-        double val = abs(out[idx][0]);
+        double val = fabs(out[idx][0]);
         if (0 != val)
             val = 20*log10(val);
+
+        if ( val > val_max )
+            val_max = val;
+        val_sum += val;
 
         //qDebug() << abs(out[idx][0]) << " " << log10(abs(out[idx][0])) << " " << 20*log10(abs(out[idx][0]));
         data[ii] = QPointF(freq_bins_mhz[ii], val);
     }
+
+    p->setAxisAutoScale(0,false);
+    p->setAxisScale(0, val_sum/num_fft_bins, val_max);
 
     fftw_destroy_plan(my_plan);
     fftw_free(in);
@@ -120,6 +131,11 @@ void MainWindow::on_pushButton_clicked()
     u_int64_t fc_hz = u_int64_t(ui->doubleSpinBox->value() * double(1e6));
 
     m_receiver.tune( fc_hz );
+}
 
-    calculateFrequencyBins(0, 0, fc_hz);
+void MainWindow::on_pushButton_2_clicked()
+{
+    double fs_hz = ui->doubleSpinBox_2->value();
+
+    m_receiver.setSampleRate( fs_hz );
 }

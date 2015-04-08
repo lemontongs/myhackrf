@@ -1,5 +1,7 @@
 #! /bin/bash
 
+make
+
 #
 # Start the blink server
 #

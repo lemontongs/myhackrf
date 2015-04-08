@@ -2,20 +2,24 @@
 #include "HackRFDevice.h"
 #include "zhelpers.h"
 
-#include <iostream>
-#include <math.h>
 #include <ctime>
 #include <fftw3.h>
+#include <iostream>
+#include <math.h>
+#include <time.h>
 #include <vector>
 
-std::clock_t program_start = std::clock();
+struct timespec program_start;
 
 bool isRunning = true;
 bool led_is_on = false;
 
-double get_duration( std::clock_t start, std::clock_t end )
+double get_duration()
 {
-    return (end-start) / CLOCKS_PER_SEC;
+    struct timespec now;
+    clock_gettime( CLOCK_REALTIME, &now );
+    
+    return double(now.tv_sec - program_start.tv_sec) + ( double(now.tv_nsec - program_start.tv_nsec) / 1e9 );
 }
 
 //
@@ -27,7 +31,7 @@ void blink_on( zmq::socket_t & socket )
     {
         led_is_on = true;
         s_send( socket, std::string("blink on") );
-        std::cout << get_duration( program_start, std::clock() ) << " blink" << std::endl;
+        std::cout << get_duration() << " blink" << std::endl;
     }
 }
 
@@ -112,17 +116,14 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
     
     mean = mean / double(num_mean);
     
-    if (mean > 0.5)
+    if (mean > 15.0)
         blink_on( blink_interface );
     else
         blink_off( blink_interface );
     
     
     if (mean > max_mean)
-    {
         max_mean = mean;
-        std::cout << max_mean << std::endl;
-    }
     
     fftw_destroy_plan(my_plan);
     fftw_free(in);
@@ -135,6 +136,8 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
 //
 int main()
 {
+    clock_gettime(CLOCK_REALTIME, &program_start);
+    
     // Start the blink server interface
     zmq::context_t blink_context(1);
     zmq::socket_t blink_interface(blink_context, ZMQ_PUB);

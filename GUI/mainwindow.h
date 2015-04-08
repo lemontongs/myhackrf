@@ -23,12 +23,15 @@ public:
 
 public slots:
     void handleNewPacket(QByteArray packet);
+    void handleNewParameters(double fc_hz, double fs_hz);
 
 signals:
     void startReceivingPackets(void);
 
 private slots:
     void on_pushButton_clicked();
+
+    void on_pushButton_2_clicked();
 
 private:
 

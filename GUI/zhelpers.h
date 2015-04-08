@@ -63,6 +63,8 @@
 static std::string
 s_recv (zmq::socket_t & socket) {
 
+    Q_UNUSED(s_recv);
+
     zmq::message_t message;
     socket.recv(&message);
 
@@ -72,6 +74,8 @@ s_recv (zmq::socket_t & socket) {
 //  Convert string to 0MQ string and send to socket
 static bool
 s_send (zmq::socket_t & socket, const std::string & string) {
+
+    Q_UNUSED(s_send);
 
     zmq::message_t message(string.size());
     memcpy (message.data(), string.data(), string.size());
@@ -83,6 +87,8 @@ s_send (zmq::socket_t & socket, const std::string & string) {
 //  Sends string as 0MQ string, as multipart non-terminal
 static bool
 s_sendmore (zmq::socket_t & socket, const std::string & string) {
+
+    Q_UNUSED(s_sendmore);
 
     zmq::message_t message(string.size());
     memcpy (message.data(), string.data(), string.size());
@@ -96,6 +102,8 @@ s_sendmore (zmq::socket_t & socket, const std::string & string) {
 static void
 s_dump (zmq::socket_t & socket)
 {
+    Q_UNUSED(s_dump);
+
     std::cout << "----------------------------------------" << std::endl;
 
     while (1) {
@@ -168,6 +176,8 @@ s_set_id(zmq::socket_t & socket, intptr_t id)
 static void
 s_version (void)
 {
+    Q_UNUSED(s_version);
+
     int major, minor, patch;
     zmq_version (&major, &minor, &patch);
     std::cout << "Current 0MQ version is " << major << "." << minor << "." << patch << std::endl;
@@ -176,6 +186,8 @@ s_version (void)
 static void
 s_version_assert (int want_major, int want_minor)
 {
+    Q_UNUSED(s_version_assert);
+
     int major, minor, patch;
     zmq_version (&major, &minor, &patch);
     if (major < want_major
@@ -191,6 +203,8 @@ s_version_assert (int want_major, int want_minor)
 static int64_t
 s_clock (void)
 {
+    Q_UNUSED(s_clock);
+
 #if (defined (WIN32))
 	FILETIME fileTime;
 	GetSystemTimeAsFileTime(&fileTime);
@@ -210,6 +224,8 @@ s_clock (void)
 static void
 s_sleep (int msecs)
 {
+    Q_UNUSED(s_sleep);
+
 #if (defined (WIN32))
     Sleep (msecs);
 #else
@@ -223,6 +239,8 @@ s_sleep (int msecs)
 static void
 s_console (const char *format, ...)
 {
+    Q_UNUSED(s_console);
+
     time_t curtime = time (NULL);
     struct tm *loctime = localtime (&curtime);
     char *formatted = new char[20];
@@ -237,6 +255,7 @@ s_console (const char *format, ...)
     printf ("\n");
 }
 
+
 //  ---------------------------------------------------------------------
 //  Signal handling
 //
@@ -247,11 +266,16 @@ s_console (const char *format, ...)
 static int s_interrupted = 0;
 static void s_signal_handler (int signal_value)
 {
+    Q_UNUSED(s_signal_handler);
+    Q_UNUSED(signal_value);
+
     s_interrupted = 1;
 }
 
 static void s_catch_signals ()
 {
+    Q_UNUSED(s_catch_signals);
+
 #if (!defined(WIN32))
     struct sigaction action;
     action.sa_handler = s_signal_handler;

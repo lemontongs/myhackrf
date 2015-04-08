@@ -80,6 +80,7 @@ s_send (zmq::socket_t & socket, const std::string & string) {
     return (rc);
 }
 
+/*
 //  Sends string as 0MQ string, as multipart non-terminal
 static bool
 s_sendmore (zmq::socket_t & socket, const std::string & string) {
@@ -90,9 +91,11 @@ s_sendmore (zmq::socket_t & socket, const std::string & string) {
     bool rc = socket.send (message, ZMQ_SNDMORE);
     return (rc);
 }
+*/
 
 //  Receives all message parts from socket, prints neatly
 //
+/*
 static void
 s_dump (zmq::socket_t & socket)
 {
@@ -133,6 +136,7 @@ s_dump (zmq::socket_t & socket)
             break;              //  Last message part
     }
 }
+*/
 
 #if (!defined (WIN32))
 //  Set simple random printable identity on socket
@@ -165,6 +169,7 @@ s_set_id(zmq::socket_t & socket, intptr_t id)
 
 //  Report 0MQ version number
 //
+/*
 static void
 s_version (void)
 {
@@ -172,6 +177,7 @@ s_version (void)
     zmq_version (&major, &minor, &patch);
     std::cout << "Current 0MQ version is " << major << "." << minor << "." << patch << std::endl;
 }
+
 
 static void
 s_version_assert (int want_major, int want_minor)
@@ -186,6 +192,7 @@ s_version_assert (int want_major, int want_minor)
         exit (EXIT_FAILURE);
     }
 }
+
 
 //  Return current system clock as milliseconds
 static int64_t
@@ -261,5 +268,5 @@ static void s_catch_signals ()
     sigaction (SIGTERM, &action, NULL);
 #endif
 }
-
+*/
 #endif

@@ -11,7 +11,9 @@ class Receiver : public QObject
 
 public:
     Receiver();
+    void initialize();
     void tune(u_int64_t fc_hz);
+    void setSampleRate(double fs_hz);
 
 public slots:
     void receivePackets();
@@ -19,11 +21,13 @@ public slots:
 
 signals:
     void newPacket(QByteArray packet);
+    void newParameters(double fc_hz, double fs_hz);
 
 private:
     void updateParameters();
 
     bool isRunning;
+    bool isInitialized;
     QString data_target;
     QString comm_target;
 
