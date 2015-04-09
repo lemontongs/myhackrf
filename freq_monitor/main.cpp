@@ -5,6 +5,7 @@
 #include <ctime>
 #include <fftw3.h>
 #include <iostream>
+#include <iomanip>
 #include <math.h>
 #include <time.h>
 #include <vector>
@@ -31,7 +32,6 @@ void blink_on( zmq::socket_t & socket )
     {
         led_is_on = true;
         s_send( socket, std::string("blink on") );
-        std::cout << get_duration() << " blink" << std::endl;
     }
 }
 
@@ -65,6 +65,7 @@ double   max_mean     = -9999;
 int      num_fft_bins = 4096;
 uint64_t target_lo_hz = 433920000;
 uint64_t target_hi_hz = 433940000;
+std::vector<double> history;
 
 //
 // fft
@@ -88,6 +89,7 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
     fftw_execute(my_plan);
     
     double mean = 0.0;
+    double peak = -9999.0;
     int num_mean = 0;
     calculateFrequencyBins( num_fft_bins, 1000000, 433900000 );
     for (int ii = 0; ii < num_fft_bins; ii++)
@@ -103,20 +105,54 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
         // 20*log10(val)
         //
         double val = abs(out[idx][0]);
-        if (0 != val)
-            val = 20*log10(val);
+        //if (0 != val)
+        //    val = 20*log10(val);
 
+        //
+        // Find the average value across the FFT (this should give us the noise floor)
+        //
+        mean += val;
+        
+        //
+        // Find the peak in the target frequency range
+        //
         if ( freq_bins_mhz[ii] > target_lo_hz && freq_bins_mhz[ii] < target_hi_hz )
         {
-            mean += out[idx][0];
-            num_mean++;
-            //std::cout << ii << " " << freq_bins_mhz[ii] << " " << out[idx][0] << " " << mean << std::endl;
+            if ( val > peak )
+                peak = val;
         }
     }
     
-    mean = mean / double(num_mean);
+    // noise floor for this FFT
+    mean = mean / double(num_fft_bins);
     
-    if (mean > 15.0)
+    // Add to the noise floor history
+    if (history.size() < 10)
+        history.push_back(mean);
+    else
+    {
+        history.erase( history.begin() );
+        history.push_back( mean );
+    }
+    
+    // noise floor for the previous 10 FFTs
+    double history_average = 0.0;
+    for ( int ii = 0; ii < history.size(); ii++ )
+    {
+        history_average += history[ii];
+    }
+    history_average = history_average / double( history.size() );
+    
+    // threshold is some constant over the history
+    double signal_to_noise = peak - history_average;
+    
+    std::cout << " t: " << std::left << std::setw(5) << get_duration() 
+              << " n: " << std::left << std::setw(8) << std::setprecision(4) << history_average
+              << " p: " << std::left << std::setw(4) << peak
+              << " r: " << std::left << std::setw(8) << std::setprecision(4) << signal_to_noise
+              << std::endl;
+    
+    if ( signal_to_noise > 150.0 )
         blink_on( blink_interface );
     else
         blink_off( blink_interface );
