@@ -2,12 +2,12 @@
 
 EXECUTABLE=test_driver
 
-CXXFLAGS=-I/usr/local/include/libhackrf/
-LDLIBS=-lhackrf
+CXXFLAGS=-I/usr/local/include/
+LDLIBS=-lrtlsdr
 #LDFLAGS=-L./
 CXX=g++ 
 
-SRCS=HackRFDevice.cpp test_hackrf.cpp
+SRCS=RTLSDRDevice.cpp test_rtl.cpp
 OBJS=$(subst .cpp,.o,$(SRCS))
 
 all: %(EXECUTABLE)
