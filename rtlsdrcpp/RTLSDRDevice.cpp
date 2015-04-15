@@ -50,19 +50,37 @@ bool RTLSDRDevice::initialize()
     return true;
 }
 
-bool RTLSDRDevice::start_Rx( rtlsdr_read_async_cb_t callback, void* args = NULL )
+void* thread_func(void* args)
+{
+    std::cout << "Rx thread started" << std::endl;
+    
+    RTLSDRDevice* rtl_obj = (RTLSDRDevice*)args;
+    
+    rtl_obj->m_device_mode = RX_MODE;
+    
+    rtl_obj->check_error( rtlsdr_reset_buffer( rtl_obj->m_device ) );
+    
+    rtl_obj->check_error( 
+        rtlsdr_read_async( 
+            rtl_obj->m_device, 
+            rtl_obj->m_callback, 
+            rtl_obj->m_callback_args, 
+            0, 
+            0 ) ); // Blocking
+}
+
+bool RTLSDRDevice::start_Rx( rtlsdr_read_async_cb_t callback, void* args )
 {
     if ( m_is_initialized && m_device_mode == STANDBY_MODE )
     {
-        std::cout << "Starting Rx" << std::endl;
+        std::cout << "Starting Rx thread " << m_is_initialized << std::endl;
         
-        check_error( rtlsdr_reset_buffer( m_device ) );
+        m_callback_args = args;
+        m_callback = callback;
         
-        if ( check_error( rtlsdr_wait_async( m_device, callback, args ) ) )
-        {
-            m_device_mode == RX_MODE;
-            return true;
-        }
+        pthread_create( &m_thread_context, NULL, thread_func, (void*)this );
+        
+        return true;
     }
     return false;
 }
@@ -77,6 +95,7 @@ bool RTLSDRDevice::stop_Rx()
             std::cout << "Error: failed to stop rx mode!" << std::endl;
             return false;
         }
+        pthread_join( m_thread_context, NULL );
         m_device_mode == STANDBY_MODE;
         return true;
     }
@@ -162,13 +181,13 @@ bool RTLSDRDevice::cleanup()
 {
     if ( m_is_initialized )
     {
-        m_is_initialized = false;
-        
         stop_Rx();
         
         if ( ! check_error( rtlsdr_close( m_device ) ) )
             std::cout << "Error: failed to release device!" << std::endl;
 
+        m_is_initialized = false;
+        
         std::cout << "Cleanup complete!" << std::endl;
         return true;
     }

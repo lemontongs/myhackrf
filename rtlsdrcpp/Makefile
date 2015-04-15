@@ -3,7 +3,7 @@
 EXECUTABLE=test_driver
 
 CXXFLAGS=-I/usr/local/include/
-LDLIBS=-lrtlsdr
+LDLIBS=-lrtlsdr -lpthread
 #LDFLAGS=-L./
 CXX=g++ 
 

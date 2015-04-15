@@ -1,11 +1,11 @@
 
-
-
 #include <rtl-sdr.h>
+#include <pthread.h>
 
 #define STANDBY_MODE 0
 #define RX_MODE      1
-#define TX_MODE      2
+
+void* thread_func(void* args);
 
 class RTLSDRDevice
 {
@@ -16,7 +16,7 @@ public:
     bool initialize();
     bool cleanup();
     
-    bool start_Rx( rtlsdr_read_async_cb_t callback, void* args );
+    bool start_Rx( rtlsdr_read_async_cb_t callback, void* args = NULL );
     bool stop_Rx();
     
     bool tune( uint64_t fc_hz );
@@ -36,9 +36,16 @@ private:
     uint64_t       m_fc_hz;          // center freq
     uint32_t       m_fs_hz;          // sample rate
     uint32_t       m_lna_gain;
+    pthread_t      m_thread_context; // Rx thread context
+    
+    rtlsdr_read_async_cb_t m_callback;
+    void* m_callback_args;
+    
     
     // PRIVATE FUNCTIONS
     bool check_error(int error);
+    
+    friend void* thread_func(void* args);
 };
 
 

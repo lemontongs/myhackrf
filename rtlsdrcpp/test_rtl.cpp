@@ -39,11 +39,9 @@ int main()
     RTLSDRDevice rtlsdr;
     
     bool rv = rtlsdr.initialize();
-    rv = rtlsdr.start_Rx( rx_cb_fn, NULL );
+    rv = rtlsdr.start_Rx( rx_cb_fn );
     
     sleep(1);
-    
-    std::cout << "got here" << std::endl;
     
     return 0;
 }
