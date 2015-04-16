@@ -11,7 +11,8 @@ class Receiver : public QObject
 
 public:
     Receiver();
-    void initialize();
+    bool initialize();
+    void setIP(QString ipAddress);
     void tune(u_int64_t fc_hz);
     void setSampleRate(double fs_hz);
 
@@ -28,6 +29,8 @@ private:
 
     bool isRunning;
     bool isInitialized;
+    QString data_port;
+    QString comm_port;
     QString data_target;
     QString comm_target;
 

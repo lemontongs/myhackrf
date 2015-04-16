@@ -35,7 +35,7 @@ MainWindow::MainWindow(QWidget *parent) :
     d_curve.setStyle( QwtPlotCurve::Lines );
     d_curve.attach(p);
 
-    ui->gridLayout->addWidget( p, 2, 0, 1, 3 );
+    ui->gridLayout->addWidget( p, 3, 0, 1, 3 );
 
     emit startReceivingPackets();
 }
@@ -72,7 +72,8 @@ void MainWindow::handleNewParameters(double fc_hz, double fs_hz)
 {
     qDebug() << "Got new parameters " << num_fft_bins << " " << fc_hz << " " << fs_hz;
     calculateFrequencyBins( num_fft_bins, fs_hz, u_int64_t(fc_hz) );
-    ui->doubleSpinBox->setValue(fc_hz/1e6);
+    ui->spinBox_centerFrequency->setValue(fc_hz/1e6);
+    ui->spinBox_sampleRate->setValue(fs_hz);
 }
 
 void MainWindow::handleNewPacket(QByteArray packet)
@@ -126,16 +127,26 @@ void MainWindow::handleNewPacket(QByteArray packet)
     d_curve.setSamples( data );
 }
 
-void MainWindow::on_pushButton_clicked()
+void MainWindow::on_pushButton_setIP_clicked()
 {
-    u_int64_t fc_hz = u_int64_t(ui->doubleSpinBox->value() * double(1e6));
+    QString host = ui->lineEdit_IPaddr->text();
+
+    m_receiver.stop();
+    m_receiver.setIP(host);
+    m_receiver.initialize();
+    emit startReceivingPackets();
+}
+
+void MainWindow::on_pushButton_tune_clicked()
+{
+    u_int64_t fc_hz = u_int64_t(ui->spinBox_centerFrequency->value() * double(1e6));
 
     m_receiver.tune( fc_hz );
 }
 
-void MainWindow::on_pushButton_2_clicked()
+void MainWindow::on_pushButton_setSampleRate_clicked()
 {
-    double fs_hz = ui->doubleSpinBox_2->value();
+    double fs_hz = ui->spinBox_sampleRate->value();
 
     m_receiver.setSampleRate( fs_hz );
 }

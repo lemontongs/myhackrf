@@ -22,7 +22,7 @@ echo "blink sever: $blink_server_pid"
 hackrf_server_pid=`ps -elf | grep hackrf_server | grep -v "grep" | awk '{print $4}'`
 if [[ $hackrf_server_pid -eq "" ]]; then
     echo "Not running, starting..."
-    ../server/hackrf_server &
+    ../hackrf_server/hackrf_server &
     hackrf_server_pid=$!
 fi
 echo "blink sever: $hackrf_server_pid"

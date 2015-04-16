@@ -8,25 +8,52 @@ Receiver::Receiver()
 {
     isRunning = false;
     isInitialized = false;
-    data_target = "tcp://192.168.1.174:5555";
-    comm_target = "tcp://192.168.1.174:5556";
-}
-
-void Receiver::initialize()
-{
-    isInitialized = true;
+    data_port = "5555";
+    comm_port = "5556";
+    data_target = "tcp://192.168.1.174:" + data_port;
+    comm_target = "tcp://192.168.1.174:" + comm_port;
 
     // Setup the data receiver
     comm_context = new zmq::context_t(1);
     comm_socket = new zmq::socket_t(*comm_context, ZMQ_REQ);
-    comm_socket->connect(comm_target.toLocal8Bit().data());
+}
 
-    updateParameters();
+void Receiver::setIP(QString ipAddress)
+{
+    data_target = "tcp://" + ipAddress + ":" + data_port;
+    comm_target = "tcp://" + ipAddress + ":" + comm_port;
+}
+
+bool Receiver::initialize()
+{
+    if(!isInitialized)
+    {
+        try
+        {
+            comm_socket->connect(comm_target.toLocal8Bit().data());
+        }
+        catch (zmq::error_t &e)
+        {
+            qDebug() << QString(e.what());
+            isInitialized = false;
+            return false;
+        }
+
+        isInitialized = true;
+        updateParameters();
+        return true;
+    }
+    return false;
 }
 
 void Receiver::stop()
 {
     isRunning = false;
+
+    while(isInitialized)
+        sleep(1);
+
+    comm_socket->close();
 }
 
 void Receiver::updateParameters()

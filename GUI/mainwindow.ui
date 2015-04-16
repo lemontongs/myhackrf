@@ -17,25 +17,8 @@
    <layout class="QGridLayout" name="gridLayout_2">
     <item row="0" column="0">
      <layout class="QGridLayout" name="gridLayout">
-      <item row="0" column="2">
-       <widget class="QPushButton" name="pushButton">
-        <property name="text">
-         <string>Tune</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label">
-        <property name="text">
-         <string>Center Frequency (MHz)</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QDoubleSpinBox" name="doubleSpinBox">
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="spinBox_centerFrequency">
         <property name="suffix">
          <string extracomment="MHz"/>
         </property>
@@ -53,8 +36,8 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QDoubleSpinBox" name="doubleSpinBox_2">
+      <item row="2" column="1">
+       <widget class="QDoubleSpinBox" name="spinBox_sampleRate">
         <property name="minimum">
          <double>1000000.000000000000000</double>
         </property>
@@ -66,7 +49,7 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="0">
+      <item row="2" column="0">
        <widget class="QLabel" name="label_2">
         <property name="text">
          <string>Sample Rate (samples/s)</string>
@@ -76,8 +59,45 @@
         </property>
        </widget>
       </item>
+      <item row="2" column="2">
+       <widget class="QPushButton" name="pushButton_setSampleRate">
+        <property name="text">
+         <string>Set</string>
+        </property>
+       </widget>
+      </item>
       <item row="1" column="2">
-       <widget class="QPushButton" name="pushButton_2">
+       <widget class="QPushButton" name="pushButton_tune">
+        <property name="text">
+         <string>Tune</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label">
+        <property name="text">
+         <string>Center Frequency (MHz)</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+         <string>IP Address</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="lineEdit_IPaddr"/>
+      </item>
+      <item row="0" column="2">
+       <widget class="QPushButton" name="pushButton_setIP">
         <property name="text">
          <string>Set</string>
         </property>

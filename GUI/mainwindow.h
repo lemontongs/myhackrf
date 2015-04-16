@@ -29,9 +29,9 @@ signals:
     void startReceivingPackets(void);
 
 private slots:
-    void on_pushButton_clicked();
-
-    void on_pushButton_2_clicked();
+    void on_pushButton_setIP_clicked();
+    void on_pushButton_tune_clicked();
+    void on_pushButton_setSampleRate_clicked();
 
 private:
 
