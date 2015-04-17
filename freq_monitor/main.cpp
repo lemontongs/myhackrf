@@ -2,6 +2,7 @@
 #include "HackRFDevice.h"
 #include "zhelpers.h"
 
+#include <algorithm>
 #include <ctime>
 #include <fftw3.h>
 #include <iostream>
@@ -62,10 +63,11 @@ void calculateFrequencyBins(int N, double fs, uint64_t fc)
 }
 
 double   max_mean     = -9999;
-int      num_fft_bins = 4096;
+int      num_fft_bins = 4096/2;
 uint64_t target_lo_hz = 433920000;
 uint64_t target_hi_hz = 433940000;
 std::vector<double> history;
+std::vector< std::pair<uint64_t,uint64_t> > monitor_ranges;
 
 //
 // fft
@@ -91,7 +93,7 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
     double mean = 0.0;
     double peak = -9999.0;
     int num_mean = 0;
-    calculateFrequencyBins( num_fft_bins, 1000000, 433900000 );
+    calculateFrequencyBins( num_fft_bins, 1000000, 433800000 );
     for (int ii = 0; ii < num_fft_bins; ii++)
     {
         //
@@ -105,8 +107,8 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
         // 20*log10(val)
         //
         double val = abs(out[idx][0]);
-        //if (0 != val)
-        //    val = 20*log10(val);
+        if (0 != val)
+            val = 20*log10(val);
 
         //
         // Find the average value across the FFT (this should give us the noise floor)
@@ -116,10 +118,15 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
         //
         // Find the peak in the target frequency range
         //
-        if ( freq_bins_mhz[ii] > target_lo_hz && freq_bins_mhz[ii] < target_hi_hz )
+        for (int mm = 0; mm < monitor_ranges.size(); mm++)
         {
-            if ( val > peak )
-                peak = val;
+            if ( freq_bins_mhz[ii] > monitor_ranges[mm].first && freq_bins_mhz[ii] < monitor_ranges[mm].second )
+            {
+                //std::cout << "\e[48;5;" << std::min(int(232 + int(val)),255) << "m \e[0m";
+                
+                if ( val > peak )
+                    peak = val;
+            }
         }
     }
     
@@ -146,11 +153,35 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
     // threshold is some constant over the history
     double signal_to_noise = peak - history_average;
     
-    std::cout << " t: " << std::left << std::setw(5) << get_duration() 
+    for (int ii = 0; ii < num_fft_bins; ii++)
+    {
+        int idx = ii+(num_fft_bins/2);
+        if (ii >= (num_fft_bins/2))
+            idx = ii - (num_fft_bins/2);
+        
+        double val = abs(out[idx][0]);
+        if (0 != val)
+            val = 20*log10(val);
+        
+        for (int mm = 0; mm < monitor_ranges.size(); mm++)
+        {
+            if ( freq_bins_mhz[ii] > monitor_ranges[mm].first && freq_bins_mhz[ii] < monitor_ranges[mm].second )
+            {
+                std::cout << "\e[48;5;" << std::max(232, std::min(int(232 + int(val-history_average)),255)) << "m \e[0m";
+                //std::cout << int(val-history_average) << " ";
+            }
+        }
+    }
+    std::cout << " " << signal_to_noise << std::endl;
+    
+    /*
+    int color = 232 + int(signal_to_noise);
+    std::cout << " t: " << std::left << std::setw(8) << get_duration() 
               << " n: " << std::left << std::setw(8) << std::setprecision(4) << history_average
-              << " p: " << std::left << std::setw(4) << peak
-              << " r: " << std::left << std::setw(8) << std::setprecision(4) << signal_to_noise
-              << std::endl;
+              << " p: " << std::left << std::setw(8) << peak
+              << " r: \e[48;5;" << color << "m" << std::left << std::setw(8) << std::setprecision(4) << signal_to_noise << "\e[0m"
+              << " " << monitor_ranges[0].first << " " << monitor_ranges[0].second << std::endl;
+    */
     
     if ( signal_to_noise > 150.0 )
         blink_on( blink_interface );
@@ -166,12 +197,84 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
     fftw_free(out);
 }
 
+//
+// Parse arguments
+//
+void parse_args(int argc, char* argv[])
+{
+    for (int aa = 0; aa < argc; aa++)
+    {
+        std::string arg( argv[aa] );
+        
+        if ( arg == "-h" || arg == "--help")
+        {
+            std::cout << "Usage: " << argv[0] << " [ -f <filename> ] [ -r <low frequency> <high frequency> ]" << std::endl;
+            std::cout << "    -f <filename>               filename containing comma separated list of high and low frequencies" << std::endl;
+            std::cout << "    -r <low freq> <high freq>   low and high are frequency (Hz) ranges to monitor (can be many -r specifications" << std::endl << std::endl;
+        }
+        else if ( arg == "-f" )
+        {
+            if (aa + 1 >= argc)
+            {
+                std::cout << "Missing filename!" << std::endl;
+                exit(1);
+            }
+            
+            aa += 1;
+            
+            std::cout << "Not implemented yet :(" << std::endl;
+            exit(1);
+            
+            //TODO: parse file
+        }
+        else if ( arg == "-r" )
+        {
+            if (aa + 2 >= argc)
+            {
+                std::cout << "Missing frequency argument!" << std::endl;
+                exit(1);
+            }
+            
+            // low argument
+            std::istringstream ss_lo(argv[aa+1]);
+            uint64_t freq_lo;
+            if (!(ss_lo >> freq_lo))
+            {
+                std::cout << "ERROR: Invalid frequency argument! '" << argv[aa+1] << "'" << std::endl;
+                exit(1);
+            }
+            
+            // high argument
+            std::istringstream ss_hi(argv[aa+2]);
+            uint64_t freq_hi;
+            if (!(ss_hi >> freq_hi))
+            {
+                std::cout << "ERROR: Invalid frequency argument! '" << argv[aa+2] << "'" << std::endl;
+                exit(1);
+            }
+            
+            aa += 2;
+            
+            monitor_ranges.push_back( std::make_pair( freq_lo, freq_hi ) );
+        }
+    }
+    
+    if ( monitor_ranges.size() == 0 )
+    {
+        std::cout << "ERROR: no ranges specified!" << std::endl;
+        exit(2);
+    }
+    
+    std::cout << monitor_ranges.size() << " ranges specified!" << std::endl;
+}
 
 //
 // MAIN
 //
-int main()
+int main(int argc, char* argv[])
 {
+    parse_args(argc, argv);
+    
     clock_gettime(CLOCK_REALTIME, &program_start);
     
     // Start the blink server interface
