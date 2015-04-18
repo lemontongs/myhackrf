@@ -1,7 +1,7 @@
 
-#include "HackRFDevice.h"
-#include "zhelpers.h"
+#include "SDRReceiver.h"
 
+#include <stdint.h>
 #include <algorithm>
 #include <ctime>
 #include <fftw3.h>
@@ -62,17 +62,15 @@ void calculateFrequencyBins(int N, double fs, uint64_t fc)
         freq_bins_mhz.push_back( uint64_t( double(ii) * fs_over_N ) + fc );
 }
 
-double   max_mean     = -9999;
-int      num_fft_bins = 4096/2;
-uint64_t target_lo_hz = 433920000;
-uint64_t target_hi_hz = 433940000;
+double max_mean     = -9999;
+int    num_fft_bins = 4096/2;
 std::vector<double> history;
 std::vector< std::pair<uint64_t,uint64_t> > monitor_ranges;
 
 //
 // fft
 //
-void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
+void fft( uint8_t * buffer, int buffer_size, zmq::socket_t* blink_interface, SDRReceiver* receiver )
 {
     int num_samples = buffer_size/2;
     
@@ -93,7 +91,8 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
     double mean = 0.0;
     double peak = -9999.0;
     int num_mean = 0;
-    calculateFrequencyBins( num_fft_bins, 1000000, 433800000 );
+    std::vector<double> spectra;
+    
     for (int ii = 0; ii < num_fft_bins; ii++)
     {
         //
@@ -109,7 +108,10 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
         double val = abs(out[idx][0]);
         if (0 != val)
             val = 20*log10(val);
-
+        
+        // save the bin
+        spectra.push_back(val);
+        
         //
         // Find the average value across the FFT (this should give us the noise floor)
         //
@@ -122,8 +124,6 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
         {
             if ( freq_bins_mhz[ii] > monitor_ranges[mm].first && freq_bins_mhz[ii] < monitor_ranges[mm].second )
             {
-                //std::cout << "\e[48;5;" << std::min(int(232 + int(val)),255) << "m \e[0m";
-                
                 if ( val > peak )
                     peak = val;
             }
@@ -153,40 +153,24 @@ void fft( uint8_t * buffer, int buffer_size, zmq::socket_t & blink_interface )
     // threshold is some constant over the history
     double signal_to_noise = peak - history_average;
     
-    for (int ii = 0; ii < num_fft_bins; ii++)
+    std::cout << std::left << std::setw(8) << get_duration();
+    for (int mm = 0; mm < monitor_ranges.size(); mm++)
     {
-        int idx = ii+(num_fft_bins/2);
-        if (ii >= (num_fft_bins/2))
-            idx = ii - (num_fft_bins/2);
-        
-        double val = abs(out[idx][0]);
-        if (0 != val)
-            val = 20*log10(val);
-        
-        for (int mm = 0; mm < monitor_ranges.size(); mm++)
+        std::cout << "  ";
+        for (int ii = 0; ii < spectra.size(); ii++)
         {
             if ( freq_bins_mhz[ii] > monitor_ranges[mm].first && freq_bins_mhz[ii] < monitor_ranges[mm].second )
             {
-                std::cout << "\e[48;5;" << std::max(232, std::min(int(232 + int(val-history_average)),255)) << "m \e[0m";
-                //std::cout << int(val-history_average) << " ";
+                std::cout << "\e[48;5;" << std::max(232, std::min(int(232 + int(spectra[ii]-history_average)),255)) << "m \e[0m";
             }
         }
     }
     std::cout << " " << signal_to_noise << std::endl;
     
-    /*
-    int color = 232 + int(signal_to_noise);
-    std::cout << " t: " << std::left << std::setw(8) << get_duration() 
-              << " n: " << std::left << std::setw(8) << std::setprecision(4) << history_average
-              << " p: " << std::left << std::setw(8) << peak
-              << " r: \e[48;5;" << color << "m" << std::left << std::setw(8) << std::setprecision(4) << signal_to_noise << "\e[0m"
-              << " " << monitor_ranges[0].first << " " << monitor_ranges[0].second << std::endl;
-    */
-    
     if ( signal_to_noise > 150.0 )
-        blink_on( blink_interface );
+        blink_on( *blink_interface );
     else
-        blink_off( blink_interface );
+        blink_off( *blink_interface );
     
     
     if (mean > max_mean)
@@ -269,6 +253,16 @@ void parse_args(int argc, char* argv[])
 }
 
 //
+// receiver callback
+//
+void receive_callback( uint8_t* buf, uint32_t len, void* args )
+{
+    std::pair< zmq::socket_t*, SDRReceiver*>* p_args = (std::pair< zmq::socket_t*, SDRReceiver*>*)args;
+    
+    fft( buf, len, p_args->first, p_args->second );
+}
+
+//
 // MAIN
 //
 int main(int argc, char* argv[])
@@ -288,23 +282,18 @@ int main(int argc, char* argv[])
     sleep(1);
     
     // Setup the data receiver
-    zmq::context_t recv_context(1);
-    zmq::socket_t data_interface(recv_context, ZMQ_SUB);
-    data_interface.connect("tcp://localhost:5555");
-    data_interface.setsockopt(ZMQ_SUBSCRIBE, "", 0);
-    int timeout = 100; // ms
-    data_interface.setsockopt(ZMQ_RCVTIMEO, &timeout, sizeof(timeout));
-
-    while (isRunning)
-    {
-        zmq::message_t msg;
-        if ( data_interface.recv(&msg) )
-        {
-            uint8_t* data = static_cast<uint8_t*>( msg.data() );
-            fft( data, msg.size(), blink_interface );
-        }
-    }
-
+    SDRReceiver rcv;
+    std::pair< zmq::socket_t*, SDRReceiver*> args = std::make_pair( &blink_interface, &rcv );
+    rcv.initialize( receive_callback, (void*)&args );
+    rcv.tune( monitor_ranges[0].first ); //TODO: do something interesting with the center freq
+    
+    calculateFrequencyBins( num_fft_bins, 
+                            rcv.getSampleRate(), 
+                            rcv.getCenterFrequency() );
+    
+    while(1)
+        sleep(1);
+    
     return 0;
 }
 

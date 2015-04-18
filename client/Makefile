@@ -1,13 +1,13 @@
 
 
-EXECUTABLE=client
+EXECUTABLE=test_client
 
 CXXFLAGS=
-LDLIBS=-lzmq
+LDLIBS=-lzmq -lpthread
 LDFLAGS=
 CXX=g++
 
-SRCS=main.cpp
+SRCS=SDRReceiver.cpp main.cpp
 OBJS=$(subst .cpp,.o,$(SRCS))
 
 all: %(EXECUTABLE)
@@ -16,7 +16,7 @@ all: %(EXECUTABLE)
 	$(CXX) $(LDFLAGS) -o $(EXECUTABLE) $(OBJS) $(LDLIBS)
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	$(RM) $(OBJS)

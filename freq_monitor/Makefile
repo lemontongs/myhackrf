@@ -2,12 +2,12 @@
 
 EXECUTABLE=freq_monitor
 
-CXXFLAGS=-I/usr/local/include/libhackrf/ -I../hackrfcpp/
-LDLIBS=-lzmq -lhackrf -lfftw3
+CXXFLAGS=-I../client/
+LDLIBS=-lzmq -lfftw3 -lpthread
 #LDFLAGS=-L./
 CXX=g++
 
-SRCS=../hackrfcpp/HackRFDevice.cpp main.cpp
+SRCS=../client/SDRReceiver.cpp main.cpp
 OBJS=$(subst .cpp,.o,$(SRCS))
 
 all: %(EXECUTABLE)
