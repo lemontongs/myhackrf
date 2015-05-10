@@ -2,12 +2,13 @@
 #define SDRRECEIVER_H
 
 #include "zhelpers.h"
+#include "packet.pb.h"
 
 #include <pthread.h>
 #include <stdint.h>
 #include <string>
 
-typedef void(*sdr_receive_callback_t)(uint8_t* buf, uint32_t len, void* args);
+typedef void(*sdr_receive_callback_t)( Packet &p, void* args );
 
 class SDRReceiver
 {

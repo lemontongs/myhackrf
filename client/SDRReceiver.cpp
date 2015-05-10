@@ -93,8 +93,13 @@ void SDRReceiver::receivePackets()
         zmq::message_t msg;
         if ( socket.recv(&msg) )
         {
-            uint8_t* data = static_cast<uint8_t*>(msg.data());
-            m_callback( data, msg.size(), m_callback_args );
+            char* data_p = static_cast<char*>(msg.data());
+            std::string data( data_p, msg.size() );
+            
+            Packet p;
+            p.ParseFromString(data);
+            
+            m_callback( p, m_callback_args );
         }
     }
 

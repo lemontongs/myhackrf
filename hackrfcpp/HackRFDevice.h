@@ -1,4 +1,6 @@
 
+#ifndef HACKRFDEVICE_H
+#define HACKRFDEVICE_H
 
 
 #include <hackrf.h>
@@ -58,7 +60,7 @@ private:
 
 
 
-
+#endif /*  HACKRFDEVICE */
 
 
 

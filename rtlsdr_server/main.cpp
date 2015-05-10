@@ -1,4 +1,6 @@
 
+#include "fft.h"
+#include "packet.pb.h"
 #include "RTLSDRDevice.h"
 #include "zhelpers.h"
 
@@ -20,6 +22,7 @@ void signal_handler(int s)
     exit(0);
 }
 
+
 //
 // Callback function for rx samples
 //
@@ -30,8 +33,19 @@ void sample_block_cb_fn(unsigned char *buf, uint32_t len, void *ctx)
     
     // send the packet out over the network
     zmq::socket_t * publisher = (zmq::socket_t *)ctx;
-    zmq::message_t message((void*)buf, len, NULL);
-    publisher->send(message);
+    
+    Packet packet = \
+        utilities::fft( buf, \
+                        len, \
+                        2048, \
+                        rtlsdr.get_sample_rate(), \
+                        rtlsdr.get_center_frequency() );
+        
+    packet.set_type(Packet_PacketType_FFT);
+    
+    std::string data;
+    packet.SerializeToString(&data);
+    s_send( *publisher, data );
 }
 
 
@@ -44,7 +58,7 @@ bool process_messages( zmq::socket_t & comm_sock )
     {
         std::string message = s_recv( comm_sock );
         
-        std::cout << "Received: '" << message << "'" << std::endl;
+        std::cout << "rtlsdr_server: Received: '" << message << "'" << std::endl;
 
         std::vector<std::string> fields;
         std::string temp;
@@ -54,7 +68,7 @@ bool process_messages( zmq::socket_t & comm_sock )
 
         if ( fields.size() < 1 )
         {
-            s_send( comm_sock, std::string("ERROR: invalid request") );
+            s_send( comm_sock, std::string("rtlsdr_server: ERROR: invalid request") );
             continue;
         }
         
@@ -96,12 +110,12 @@ bool process_messages( zmq::socket_t & comm_sock )
             uint64_t new_fc_hz;
             if (!(ss >> new_fc_hz))
             {
-                std::cout << "tune failed: '" << fields[1] << "'" << std::endl;
+                std::cout << "rtlsdr_server: tune failed: '" << fields[1] << "'" << std::endl;
                 s_send( comm_sock, std::string("ERROR: invalid tune argument") );
             }
             else if ( rtlsdr.tune( new_fc_hz ) )
             {
-                std::cout << "tuned to: " << new_fc_hz << std::endl;
+                std::cout << "rtlsdr_server: tuned to: " << new_fc_hz << std::endl;
                 s_send( comm_sock, std::string("OK") );
             }
             else
@@ -115,12 +129,12 @@ bool process_messages( zmq::socket_t & comm_sock )
             uint64_t new_fs_hz;
             if (!(ss >> new_fs_hz))
             {
-                std::cout << "set-fs failed: '" << fields[1] << "'" << std::endl;
+                std::cout << "rtlsdr_server: set-fs failed: '" << fields[1] << "'" << std::endl;
                 s_send( comm_sock, std::string("ERROR: invalid sample rate argument") );
             }
             else if ( rtlsdr.tune( new_fs_hz ) )
             {
-                std::cout << "sample rate set to: " << new_fs_hz << std::endl;
+                std::cout << "rtlsdr_server: sample rate set to: " << new_fs_hz << std::endl;
                 s_send( comm_sock, std::string("OK") );
             }
             else
@@ -134,12 +148,12 @@ bool process_messages( zmq::socket_t & comm_sock )
             uint64_t new_lna_gain;
             if (!(ss >> new_lna_gain))
             {
-                std::cout << "set-lna failed: '" << fields[1] << "'" << std::endl;
+                std::cout << "rtlsdr_server: set-lna failed: '" << fields[1] << "'" << std::endl;
                 s_send( comm_sock, std::string("ERROR: invalid lna gain argument") );
             }
             else if ( rtlsdr.tune( new_lna_gain ) )
             {
-                std::cout << "lna gain set to: " << new_lna_gain << std::endl;
+                std::cout << "rtlsdr_server: lna gain set to: " << new_lna_gain << std::endl;
                 s_send( comm_sock, std::string("OK") );
             }
             else
@@ -175,7 +189,7 @@ int main()
     {
         rtlsdr.set_sample_rate( 1000000 );
         rtlsdr.tune( 433900000 );
-        rtlsdr.set_lna_gain( 87 );
+        rtlsdr.set_lna_gain( 480 );
         
         // Start receiving data
         rtlsdr.start_Rx( sample_block_cb_fn, (void*)(&publisher) );

@@ -1,5 +1,6 @@
 
 #include "SDRReceiver.h"
+#include "packet.pb.h"
 
 #include <iostream>
 #include <stdint.h>
@@ -14,9 +15,9 @@ void signal_handler(int s)
     exit(1);
 }
 
-void callback( uint8_t* buf, uint32_t len, void* args )
+void callback( Packet &p, void* args )
 {
-    std::cout << "Got a packet! (" << len << ")" << std::endl;
+    std::cout << "Got a packet! (" << p.signal_size() << ")" << std::endl;
 }
 
 //

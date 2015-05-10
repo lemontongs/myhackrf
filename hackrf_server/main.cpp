@@ -1,5 +1,7 @@
 
+#include "fft.h"
 #include "HackRFDevice.h"
+#include "packet.pb.h"
 #include "zhelpers.h"
 
 #include <signal.h>
@@ -20,6 +22,7 @@ void signal_handler(int s)
     exit(0);
 }
 
+
 //
 // Callback function for rx samples
 //
@@ -27,9 +30,32 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
 {
     // send the packet out over the network
     zmq::socket_t * publisher = (zmq::socket_t *)transfer->rx_ctx;
-    zmq::message_t message((void*)transfer->buffer, transfer->valid_length, NULL);
-    publisher->send(message);
-
+    
+    Packet packet;
+    if (1)
+    {
+        packet = \
+            utilities::fft( transfer->buffer, \
+                            transfer->valid_length, \
+                            2048, \
+                            hackrf.get_sample_rate(), \
+                            hackrf.get_center_frequency() );
+        
+        packet.set_type(Packet_PacketType_FFT);
+    }
+    else
+    {
+        packet.set_type(Packet_PacketType_RAW);
+        for (int ii = 0; ii < transfer->valid_length; ii++)
+        {
+            packet.add_signal(transfer->buffer[ii]);
+        }
+    }
+        
+    std::string data;
+    packet.SerializeToString(&data);
+    s_send( *publisher, data );
+    
     return 0;
 }
 
@@ -42,7 +68,7 @@ bool process_messages( zmq::socket_t & comm_sock )
     {
         std::string message = s_recv( comm_sock );
         
-        std::cout << "Received: '" << message << "'" << std::endl;
+        std::cout << "hackrf_server: Received: '" << message << "'" << std::endl;
 
         std::vector<std::string> fields;
         std::string temp;
@@ -52,7 +78,7 @@ bool process_messages( zmq::socket_t & comm_sock )
 
         if ( fields.size() < 1 )
         {
-            s_send( comm_sock, std::string("ERROR: invalid request") );
+            s_send( comm_sock, std::string("hackrf_server: ERROR: invalid request") );
             continue;
         }
         
@@ -94,12 +120,12 @@ bool process_messages( zmq::socket_t & comm_sock )
             uint64_t new_fc_hz;
             if (!(ss >> new_fc_hz))
             {
-                std::cout << "tune failed: '" << fields[1] << "'" << std::endl;
+                std::cout << "hackrf_server: tune failed: '" << fields[1] << "'" << std::endl;
                 s_send( comm_sock, std::string("ERROR: invalid tune argument") );
             }
             else if ( hackrf.tune( new_fc_hz ) )
             {
-                std::cout << "tuned to: " << new_fc_hz << std::endl;
+                std::cout << "hackrf_server: tuned to: " << new_fc_hz << std::endl;
                 s_send( comm_sock, std::string("OK") );
             }
             else
@@ -110,15 +136,15 @@ bool process_messages( zmq::socket_t & comm_sock )
         if ( fields[0] == "set-fs" && fields.size() >= 2 )
         {
             std::istringstream ss(fields[1]);
-            uint64_t new_fs_hz;
+            double new_fs_hz;
             if (!(ss >> new_fs_hz))
             {
-                std::cout << "set-fs failed: '" << fields[1] << "'" << std::endl;
+                std::cout << "hackrf_server: set-fs failed: '" << fields[1] << "'" << std::endl;
                 s_send( comm_sock, std::string("ERROR: invalid sample rate argument") );
             }
-            else if ( hackrf.tune( new_fs_hz ) )
+            else if ( hackrf.set_sample_rate( new_fs_hz ) )
             {
-                std::cout << "sample rate set to: " << new_fs_hz << std::endl;
+                std::cout << "hackrf_server: sample rate set to: " << new_fs_hz << std::endl;
                 s_send( comm_sock, std::string("OK") );
             }
             else
@@ -132,12 +158,12 @@ bool process_messages( zmq::socket_t & comm_sock )
             uint64_t new_lna_gain;
             if (!(ss >> new_lna_gain))
             {
-                std::cout << "set-lna failed: '" << fields[1] << "'" << std::endl;
+                std::cout << "hackrf_server: set-lna failed: '" << fields[1] << "'" << std::endl;
                 s_send( comm_sock, std::string("ERROR: invalid lna gain argument") );
             }
             else if ( hackrf.tune( new_lna_gain ) )
             {
-                std::cout << "lna gain set to: " << new_lna_gain << std::endl;
+                std::cout << "hackrf_server: lna gain set to: " << new_lna_gain << std::endl;
                 s_send( comm_sock, std::string("OK") );
             }
             else

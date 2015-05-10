@@ -11,15 +11,19 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = GUI
 TEMPLATE = app
 
-LIBS += -lzmq -lfftw3
+LIBS += -L/usr/local/lib/ -lzmq -lprotobuf -lpthread
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    receiver.cpp
+        receiver.cpp \
+        ../protobuffers/packet.pb.cc
 
 HEADERS  += mainwindow.h \
-    receiver.h \
-    zhelpers.h
+        receiver.h \
+        zhelpers.h \
+        ../protobuffers/packet.pb.h
+
+INCLUDEPATH += ../protobuffers
 
 FORMS    += mainwindow.ui
 

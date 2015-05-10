@@ -3,6 +3,7 @@
 
 #include <QObject>
 
+#include "packet.pb.h"
 #include "zhelpers.h"
 
 class Receiver : public QObject
@@ -21,7 +22,7 @@ public slots:
     void stop();
 
 signals:
-    void newPacket(QByteArray packet);
+    void newPacket(Packet pkt);
     void newParameters(double fc_hz, double fs_hz);
 
 private:

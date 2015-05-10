@@ -7,6 +7,7 @@
 #include <qwt_plot_curve.h>
 #include <qwt_plot.h>
 
+#include "packet.pb.h"
 #include "receiver.h"
 
 namespace Ui {
@@ -22,7 +23,7 @@ public:
     ~MainWindow();
 
 public slots:
-    void handleNewPacket(QByteArray packet);
+    void handleNewPacket(Packet p);
     void handleNewParameters(double fc_hz, double fs_hz);
 
 signals:
@@ -36,7 +37,6 @@ private slots:
 private:
 
     void closeEvent(QCloseEvent *event);
-    void calculateFrequencyBins(int N, double fs, u_int64_t fc);
 
     Ui::MainWindow *ui;
 

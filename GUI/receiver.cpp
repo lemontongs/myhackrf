@@ -90,9 +90,13 @@ void Receiver::receivePackets()
         zmq::message_t msg;
         if ( socket.recv(&msg) )
         {
-            char* data = static_cast<char*>(msg.data());
-            QByteArray ba(data, msg.size());
-            emit newPacket(ba);
+            char* data_p = static_cast<char*>(msg.data());
+            std::string data(data_p, msg.size());
+
+            Packet p;
+            p.ParseFromString(data);
+
+            emit newPacket(p);
         }
     }
 
