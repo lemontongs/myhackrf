@@ -24,7 +24,7 @@ public:
 
 public slots:
     void handleNewPacket(Packet p);
-    void handleNewParameters(double fc_hz, double fs_hz);
+    void handleNewParameters(double fc_hz, double fs_hz, QString host);
 
 signals:
     void startReceivingPackets(void);

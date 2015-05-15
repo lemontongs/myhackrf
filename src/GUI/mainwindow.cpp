@@ -17,7 +17,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     qRegisterMetaType<Packet>("Packet");
 
-    connect(&m_receiver, SIGNAL(newParameters(double,double)), this, SLOT(handleNewParameters(double,double)));
+    connect(&m_receiver, SIGNAL(newParameters(double,double,QString)), this, SLOT(handleNewParameters(double,double,QString)));
     connect(&m_receiver, SIGNAL(newPacket(Packet)), this, SLOT(handleNewPacket(Packet)), Qt::QueuedConnection);
     connect(&m_receiveThread, SIGNAL(finished()), &m_receiveThread, SLOT(deleteLater()));
     connect(this, SIGNAL(startReceivingPackets()), &m_receiver, SLOT(receivePackets()));
@@ -57,11 +57,12 @@ void MainWindow::closeEvent(QCloseEvent *event)
     m_receiver.stop();
 }
 
-void MainWindow::handleNewParameters(double fc_hz, double fs_hz)
+void MainWindow::handleNewParameters(double fc_hz, double fs_hz, QString host)
 {
     qDebug() << "Got new parameters " << num_fft_bins << " " << fc_hz << " " << fs_hz;
     ui->spinBox_centerFrequency->setValue(fc_hz/1e6);
     ui->spinBox_sampleRate->setValue(fs_hz);
+    ui->lineEdit_IPaddr->setText(host);
 }
 
 void MainWindow::handleNewPacket(Packet pak)
@@ -73,7 +74,7 @@ void MainWindow::handleNewPacket(Packet pak)
     }
 
     p->setAxisAutoScale(0,false);
-    p->setAxisScale(0, pak.mean_db(), 50.0);
+    p->setAxisScale(0, -60.0, 50.0);
 
     d_curve.setPen( Qt::blue );
     d_curve.setStyle( QwtPlotCurve::Lines );

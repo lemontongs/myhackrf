@@ -10,8 +10,8 @@ Receiver::Receiver()
     isInitialized = false;
     data_port = "5555";
     comm_port = "5556";
-    data_target = "tcp://192.168.1.174:" + data_port;
-    comm_target = "tcp://192.168.1.174:" + comm_port;
+    data_target = "tcp://odroid:" + data_port;
+    comm_target = "tcp://odroid:" + comm_port;
 
     // Setup the data receiver
     comm_context = new zmq::context_t(1);
@@ -70,7 +70,7 @@ void Receiver::updateParameters()
     ss2 >> fs_hz;
     qDebug() << "Got: " << fs_hz;
 
-    emit newParameters(double(fc_hz), fs_hz);
+    emit newParameters(double(fc_hz), fs_hz, data_target);
     qDebug() << "Emitting new parameters";
 }
 

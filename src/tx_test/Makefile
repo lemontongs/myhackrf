@@ -20,6 +20,4 @@ all: %(EXECUTABLE)
 
 clean:
 	$(RM) $(OBJS)
-
-distclean: clean
 	$(RM) $(EXECUTABLE)

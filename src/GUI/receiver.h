@@ -23,7 +23,7 @@ public slots:
 
 signals:
     void newPacket(Packet pkt);
-    void newParameters(double fc_hz, double fs_hz);
+    void newParameters(double fc_hz, double fs_hz, QString data_target);
 
 private:
     void updateParameters();
