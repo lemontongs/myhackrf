@@ -1,0 +1,22 @@
+syntax="proto2";
+
+message Packet {
+  
+  enum PacketType {
+    RAW = 0;
+    FFT = 1;
+  }
+  
+  required PacketType type = 1;
+  
+  repeated double signal = 2;
+  repeated uint64 freq_bins_mhz = 3;
+  
+  optional int32 num_bins = 4;
+  optional int32 num_samples = 5;
+  optional double mean_db = 6;
+  optional double peak_db = 7;
+  optional double peak_bin_index = 8;
+  optional double low_db = 9;
+}
+
