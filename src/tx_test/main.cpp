@@ -1,5 +1,5 @@
 
-#include "hackrf.h"
+#include "HackRFDevice.h"
 
 #include <signal.h>
 #include <stdio.h>
@@ -10,45 +10,25 @@
 #include <vector>
 
 #define PI 3.14159265
+#define MESSAGE "Hello World! "
 
-hackrf_device* device = NULL;
+char msg[] = MESSAGE;
+bool bits[sizeof(msg)*8];
+
+HackRFDevice hackrf;
+
 uint64_t fc_hz      = 910000000; // center freq
 double   fs_hz      = 8000000;   // sample rate
 uint32_t lna_gain   = 0;
 uint8_t  amp_enable = 0;
 uint32_t txvga_gain = 47;
 
-//
-// Check for hackrf error message
-//
-bool check_error(int error)
-{
-    hackrf_error hrf_e = hackrf_error(error);
-
-    if ( HACKRF_SUCCESS == hrf_e )
-        return true;
-    else
-        std::cout << "Error: " << hackrf_error_name( hrf_e ) << std::endl;
-    return false;
-}
-
-void cleanup()
-{
-    std::cout << "Stopping Tx" << std::endl;
-    if ( ! check_error( hackrf_stop_tx( device ) ) )
-        std::cout << "Error: failed to stop tx mode!" << std::endl;
-    if ( ! check_error( hackrf_close(device) ) )
-        std::cout << "Error: failed to release device!" << std::endl;
-
-    hackrf_exit();
-    std::cout << "Done" << std::endl;
-    exit(1);
-}
 
 void signal_handler(int s)
 {
     printf("Caught signal %d\n",s);
-    cleanup();
+    hackrf.cleanup();
+    exit(0);
 }
 
 
@@ -57,13 +37,36 @@ void signal_handler(int s)
 //
 //262144
 double t = 0.0;
-double dt = 1/8000000.0;
+double dt = 1/fs_hz;
 bool print_signal = true;
 double df = 1000;
+int bit_index = 0;
+
 int sample_block_cb_fn(hackrf_transfer* transfer)
 {
+    bool bit = bits[bit_index++];
+    
+    if (bit_index >= sizeof(bits))
+        bit_index = 0;
+    
     for (int ii = 0; ii < transfer->valid_length; ii+=2)
     {
+        // Manchester encode
+        bool first_half = ( ii < ( transfer->valid_length / 2 ) );
+        
+        // High bit means transition low to high
+        if ( bit )
+            if ( first_half )
+                df = -1000;
+            else
+                df = 1000;
+        // Low bit means transition high to low
+        else
+            if ( first_half )
+                df = 1000;
+            else
+                df = -1000;
+        
         double i = 128.0 * cos( 2.0 * PI * df * t );  // I
         double q = 128.0 * sin( 2.0 * PI * df * t );  // Q
         
@@ -80,8 +83,6 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
         }
     }
     
-    df = -df;
-    
     return 0;
 }
 
@@ -91,59 +92,6 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
 //
 int main()
 {
-    uint8_t board_id = BOARD_ID_INVALID;
-    char version[255 + 1];
-    read_partid_serialno_t read_partid_serialno;
-
-    if ( ! check_error( hackrf_init() ) )
-        return EXIT_FAILURE;
-
-    if ( ! check_error( hackrf_open( &device ) ) )
-        return EXIT_FAILURE;
-
-    printf("Found HackRF board.\n");
-
-    if ( ! check_error( hackrf_board_id_read(device, &board_id) ) )
-        return EXIT_FAILURE;
-
-    if ( ! check_error( hackrf_version_string_read(device, &version[0], 255) ) )
-        return EXIT_FAILURE;
-
-    printf("Firmware Version: %s\n", version);
-
-    if ( ! check_error( hackrf_board_partid_serialno_read(device, &read_partid_serialno) ) )
-        return EXIT_FAILURE;
-
-    printf("Part ID Number: 0x%08x 0x%08x\n",
-            read_partid_serialno.part_id[0],
-            read_partid_serialno.part_id[1]);
-    printf("Serial Number: 0x%08x 0x%08x 0x%08x 0x%08x\n",
-            read_partid_serialno.serial_no[0],
-            read_partid_serialno.serial_no[1],
-            read_partid_serialno.serial_no[2],
-            read_partid_serialno.serial_no[3]);
-
-    std::cout << "Tuning..." << std::endl;
-    if ( ! check_error( hackrf_set_freq( device, fc_hz ) ) )
-        return EXIT_FAILURE;
-
-    std::cout << "Setting sample rate..." << std::endl;
-    if ( ! check_error( hackrf_set_sample_rate( device, fs_hz ) ) )
-        return EXIT_FAILURE;
-
-    std::cout << "Setting gain..." << std::endl;
-    if ( ! check_error( hackrf_set_lna_gain( device, lna_gain ) ) )
-        return EXIT_FAILURE;
-
-    std::cout << "Disabling amp..." << std::endl;
-    if ( ! check_error( hackrf_set_amp_enable( device, amp_enable ) ) )
-        return EXIT_FAILURE;
-
-    std::cout << "Disabling txvga..." << std::endl;
-    if ( ! check_error( hackrf_set_txvga_gain( device, txvga_gain ) ) )
-        return EXIT_FAILURE;
-
-
     // Setup the interrupt signal handler
     struct sigaction sigIntHandler;
     sigIntHandler.sa_handler = signal_handler;
@@ -151,17 +99,40 @@ int main()
     sigIntHandler.sa_flags = 0;
     sigaction(SIGINT, &sigIntHandler, NULL);
 
-    // Start transmitting data
-    std::cout << "Starting Tx" << std::endl;
-    if ( ! check_error( hackrf_start_tx( device, sample_block_cb_fn, (void*)(NULL) ) ) )
-        return EXIT_FAILURE;
+    // Convert message into bits
+    printf("String:  %s\nHex:     ", msg);
+    for (int ii = 0; ii < sizeof(msg); ii++ )
+    {
+        printf("%d ", msg[ii]);
+    }
+    printf("\nBinary:  ");
+    
+    for (int ii = 0; ii < sizeof(msg); ii++ )
+    {
+        for ( int jj = 0; jj < 8; jj++ )
+        {
+            bits[(ii*8) + jj] = (msg[ii] & (0x80 >> jj)) > 0;
+            printf("%d ", bits[(ii*8) + jj]?1:0);
+        }
+    }
+    printf("\n");
+    
+    if ( ! hackrf.initialize() )
+    {
+        std::cout << "Error initializing hackrf device!" << std::endl;
+        return 1;
+    }
+    
+    hackrf.tune( fc_hz );
+    hackrf.set_sample_rate( fs_hz );
+    hackrf.set_lna_gain( lna_gain );
+    hackrf.set_amp_enable( amp_enable );
+    hackrf.set_txvga_gain( txvga_gain );
+    hackrf.start_Tx( sample_block_cb_fn, (void*)(NULL) );
 
     //  Wait a while
     sleep(300);
-
-    // Release the device
-    cleanup();
-
+    
     return 0;
 }
 

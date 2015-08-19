@@ -2,12 +2,12 @@
 
 EXECUTABLE=txtest
 
-CXXFLAGS=-I/usr/local/include/libhackrf/
+CXXFLAGS=-I/usr/local/include/libhackrf/ -I../hackrfcpp/
 LDLIBS=-lhackrf
 #LDFLAGS=-L./
 CXX=g++
 
-SRCS=main.cpp
+SRCS=../hackrfcpp/HackRFDevice.cpp main.cpp
 OBJS=$(subst .cpp,.o,$(SRCS))
 
 all: %(EXECUTABLE)
@@ -16,7 +16,7 @@ all: %(EXECUTABLE)
 	$(CXX) $(LDFLAGS) -o $(EXECUTABLE) $(OBJS) $(LDLIBS)
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $<
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	$(RM) $(OBJS)
