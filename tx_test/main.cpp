@@ -12,11 +12,11 @@
 #define PI 3.14159265
 
 hackrf_device* device = NULL;
-uint64_t fc_hz      = 462610000; // center freq
-double   fs_hz      = 1000000;   // sample rate
+uint64_t fc_hz      = 910000000; // center freq
+double   fs_hz      = 8000000;   // sample rate
 uint32_t lna_gain   = 0;
 uint8_t  amp_enable = 0;
-uint32_t txvga_gain = 0;
+uint32_t txvga_gain = 47;
 
 //
 // Check for hackrf error message
@@ -57,7 +57,7 @@ void signal_handler(int s)
 //
 //262144
 double t = 0.0;
-double dt = 1/1000000.0;
+double dt = 1/8000000.0;
 bool print_signal = true;
 double df = 1000;
 int sample_block_cb_fn(hackrf_transfer* transfer)
@@ -157,7 +157,7 @@ int main()
         return EXIT_FAILURE;
 
     //  Wait a while
-    sleep(30);
+    sleep(300);
 
     // Release the device
     cleanup();
