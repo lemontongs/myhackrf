@@ -25,7 +25,7 @@ if [[ $hackrf_server_pid -eq "" ]]; then
     ../hackrf_server/hackrf_server &
     hackrf_server_pid=$!
 fi
-echo "blink sever: $hackrf_server_pid"
+echo "hackrf sever: $hackrf_server_pid"
 
 
 ./freq_monitor

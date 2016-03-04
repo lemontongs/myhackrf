@@ -7,7 +7,7 @@ import zmq
 
 def signal_handler(signal, frame):
     print('Blink server exiting')
-    os.system("/home/mlamonta/bin/blink1-tool -q -m 0 --off")
+    os.system("blink1-tool -q -m 0 --off")
     sys.exit(0)
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -34,8 +34,8 @@ while True:
     
     for arg in args:
         if arg == "on":
-            os.system("/home/mlamonta/bin/blink1-tool -q -m 0 --hsb=130,200,80")
+            os.system("blink1-tool -q -m 0 --hsb=130,200,80")
         if arg == "off":
-            os.system("/home/mlamonta/bin/blink1-tool -q -m 0 --off")
+            os.system("blink1-tool -q -m 0 --off")
             
 

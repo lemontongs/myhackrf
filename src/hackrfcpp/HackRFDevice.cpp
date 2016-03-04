@@ -21,7 +21,12 @@ HackRFDevice::~HackRFDevice()
     cleanup();
 }
 
-bool HackRFDevice::initialize()
+int  HackRFDevice::get_mode()
+{
+    return m_device_mode;
+}
+
+bool HackRFDevice::initialize(const char* const desired_serial_number)
 {
     uint8_t board_id = BOARD_ID_INVALID;
     char version[255 + 1];
@@ -30,7 +35,7 @@ bool HackRFDevice::initialize()
     if ( ! check_error( hackrf_init() ) )
         return false;
 
-    if ( ! check_error( hackrf_open( &m_device ) ) )
+    if ( ! check_error( hackrf_open_by_serial( desired_serial_number, &m_device ) ) )
     {
         hackrf_exit();
         return false;
@@ -46,18 +51,6 @@ bool HackRFDevice::initialize()
     else
         std::cout << "HackRFDevice: Firmware Version: " << version << std::endl;
 
-/*    if ( ! check_error( hackrf_board_partid_serialno_read( m_device, &read_partid_serialno ) ) )
-        return false;
-
-    printf("Part ID Number: 0x%08x 0x%08x\n",
-            read_partid_serialno.part_id[0],
-            read_partid_serialno.part_id[1]);
-    printf("Serial Number: 0x%08x 0x%08x 0x%08x 0x%08x\n",
-            read_partid_serialno.serial_no[0],
-            read_partid_serialno.serial_no[1],
-            read_partid_serialno.serial_no[2],
-            read_partid_serialno.serial_no[3]);
-*/
 
     m_is_initialized = true;
     
@@ -85,7 +78,7 @@ bool HackRFDevice::start_Rx( hackrf_sample_block_cb_fn callback, void* args = NU
         std::cout << "HackRFDevice: Starting Rx" << std::endl;
         if ( check_error( hackrf_start_rx( m_device, callback, args ) ) )
         {
-            m_device_mode == RX_MODE;
+            m_device_mode = RX_MODE;
             return true;
         }
     }
@@ -102,7 +95,7 @@ bool HackRFDevice::stop_Rx()
             std::cout << "HackRFDevice: Error: failed to stop rx mode!" << std::endl;
             return false;
         }
-        m_device_mode == STANDBY_MODE;
+        m_device_mode = STANDBY_MODE;
         return true;
     }
     return false;
@@ -115,7 +108,7 @@ bool HackRFDevice::start_Tx( hackrf_sample_block_cb_fn callback, void* args = NU
         std::cout << "HackRFDevice: Starting Tx" << std::endl;
         if ( check_error( hackrf_start_tx( m_device, callback, args ) ) )
         {
-            m_device_mode == TX_MODE;
+            m_device_mode = TX_MODE;
             return true;
         }
     }
@@ -132,7 +125,7 @@ bool HackRFDevice::stop_Tx()
             std::cout << "HackRFDevice: Error: failed to stop tx mode!" << std::endl;
             return false;
         }
-        m_device_mode == STANDBY_MODE;
+        m_device_mode = STANDBY_MODE;
         return true;
     }
     return false;
@@ -208,7 +201,7 @@ bool HackRFDevice::set_lna_gain( uint32_t lna_gain )
         case 24:
         case 32:
         case 40:
-            std::cout << "HackRFDevice: Setting LNA gain..." << std::endl;
+            std::cout << "HackRFDevice: LNA gain: " << lna_gain << std::endl;
             if ( check_error( hackrf_set_lna_gain( m_device, lna_gain ) ) )
             {
                 m_lna_gain = lna_gain;
@@ -246,7 +239,7 @@ bool HackRFDevice::set_txvga_gain( uint32_t txvga_gain )
     {
         if ( txvga_gain >= 0 && txvga_gain <= 47 )
         {
-            std::cout << "HackRFDevice: Setting Tx VGA gain..." << std::endl;
+            std::cout << "HackRFDevice: Setting Tx VGA gain: " << txvga_gain << std::endl;
             if ( check_error( hackrf_set_txvga_gain( m_device, txvga_gain ) ) )
             {
                 m_txvga_gain = txvga_gain;
@@ -263,7 +256,7 @@ bool HackRFDevice::set_amp_enable( uint8_t amp_enable )
 {
     if ( m_is_initialized )
     {
-        std::cout << "HackRFDevice: Setting AMP enable..." << std::endl;
+        std::cout << "HackRFDevice: Setting AMP enable: " << amp_enable << std::endl;
         if ( check_error( hackrf_set_amp_enable( m_device, amp_enable ) ) )
         {
             m_amp_enable = amp_enable;
@@ -277,7 +270,7 @@ bool HackRFDevice::set_antenna_enable( uint8_t antenna_enable )
 {
     if ( m_is_initialized )
     {
-        std::cout << "HackRFDevice: Setting antenna enable..." << std::endl;
+        std::cout << "HackRFDevice: Setting antenna enable: " << antenna_enable << std::endl;
         if ( check_error( hackrf_set_antenna_enable( m_device, antenna_enable ) ) )
         {
             m_antenna_enable = antenna_enable;

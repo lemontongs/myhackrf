@@ -21,7 +21,7 @@ uint64_t fc_hz      = 910000000; // center freq
 double   fs_hz      = 8000000;   // sample rate
 uint32_t lna_gain   = 0;
 uint8_t  amp_enable = 0;
-uint32_t txvga_gain = 47;
+uint32_t txvga_gain = 27;
 
 
 void signal_handler(int s)

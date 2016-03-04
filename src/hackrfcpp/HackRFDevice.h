@@ -15,13 +15,15 @@ public:
     HackRFDevice();
     ~HackRFDevice();
     
-    bool initialize();
+    bool initialize(const char* const desired_serial_number);
     bool cleanup();
     
     bool start_Rx( hackrf_sample_block_cb_fn callback, void* args );
     bool stop_Rx();
     bool start_Tx( hackrf_sample_block_cb_fn callback, void* args );
     bool stop_Tx();
+    
+    int  get_mode(); // returns m_device_mode
     
     bool tune( uint64_t fc_hz );
     bool force_sample_rate( double fs_hz ); // not recommended
