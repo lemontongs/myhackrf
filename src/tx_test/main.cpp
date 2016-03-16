@@ -17,11 +17,11 @@ bool bits[sizeof(msg)*8];
 
 HackRFDevice hackrf;
 
-uint64_t fc_hz      = 910000000; // center freq
+uint64_t fc_hz      = 2480000000; // center freq
 double   fs_hz      = 8000000;   // sample rate
 uint32_t lna_gain   = 0;
 uint8_t  amp_enable = 0;
-uint32_t txvga_gain = 27;
+uint32_t txvga_gain = 47;
 
 
 void signal_handler(int s)
@@ -51,6 +51,7 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
     
     for (int ii = 0; ii < transfer->valid_length; ii+=2)
     {
+        /*
         // Manchester encode
         bool first_half = ( ii < ( transfer->valid_length / 2 ) );
         
@@ -75,6 +76,11 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
         
         transfer->buffer[ii+0] = i8;
         transfer->buffer[ii+1] = q8;
+        */
+        
+        transfer->buffer[ii+0] = 100;
+        transfer->buffer[ii+1] = 100;
+        
         
         t = t+dt;
         if ( t >= 1.0 )
@@ -117,7 +123,7 @@ int main()
     }
     printf("\n");
     
-    if ( ! hackrf.initialize() )
+    if ( ! hackrf.initialize("23ec7") )
     {
         std::cout << "Error initializing hackrf device!" << std::endl;
         return 1;

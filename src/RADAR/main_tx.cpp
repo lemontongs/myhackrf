@@ -14,8 +14,8 @@
 
 HackRFDevice hackrf;
 
-uint64_t fc_hz      = 2478e6; // center freq
-double   fs_hz      = 10e6;   // sample rate
+uint64_t fc_hz      = 2480e6; // center freq
+double   fs_hz      = 20e6;   // sample rate
 uint32_t lna_gain   = 0;
 uint8_t  amp_enable = 0;
 uint32_t txvga_gain = 47;
@@ -40,15 +40,16 @@ double df = 4000000.0; // 4MHz baseband CW
 //#define SAVE_FILE
 #ifdef SAVE_FILE
 int write_file = 1;
-std::ofstream ofile("tx.dat", std::ofstream::out);
+std::ofstream ofile("tx.csv", std::ofstream::out);
 #endif
 
 int sample_block_cb_fn(hackrf_transfer* transfer)
 {
     for (int ii = 0; ii < transfer->valid_length; ii+=2)
     {
-        if ( t < 0.000001 ) // 1 us
+        if ( t < 0.0000005 ) // 500 ns
         {
+            /*
             double i = 127.0 * cos( 2.0 * PI * df * t );  // I
             double q = 127.0 * sin( 2.0 * PI * df * t );  // Q
             
@@ -57,6 +58,9 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
             
             transfer->buffer[ii+0] = i8;
             transfer->buffer[ii+1] = q8;
+            */
+            transfer->buffer[ii+0] = 127;
+            transfer->buffer[ii+1] = 127;
         }
         else
         {
@@ -79,7 +83,6 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
         }
     }
     
-    t = 0.0;
     
 
 #ifdef SAVE_FILE
