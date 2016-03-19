@@ -45,7 +45,7 @@ then
     rm ${DATA_FILE}
 fi
 
-hackrf_transfer -r ${DATA_FILE} -d 22be1 -f 2480000000 -l 16 -g 0 -s ${SAMPLE_RATE} -n ${NUM_SAMPLES_RX}
+hackrf_transfer -r ${DATA_FILE} -d 22be1 -f 2480000000 -a 1 -l 40 -g 0 -s ${SAMPLE_RATE} -n ${NUM_SAMPLES_RX}
 
 # Kill the transmitter
 kill -INT $TX_PID
@@ -60,7 +60,7 @@ fi
 #
 # Process the received file
 #
-matlab -nodesktop -nosplash -r plot_file
+matlab -nodesktop -nosplash -r plot_first_pulse
 
 
 

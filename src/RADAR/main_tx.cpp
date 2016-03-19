@@ -17,8 +17,8 @@ HackRFDevice hackrf;
 uint64_t fc_hz      = 2480e6; // center freq
 double   fs_hz      = 20e6;   // sample rate
 uint32_t lna_gain   = 0;
-uint8_t  amp_enable = 0;
-uint32_t txvga_gain = 46;
+uint8_t  amp_enable = 1;
+uint32_t txvga_gain = 47;
 
 
 void signal_handler(int s)
@@ -47,7 +47,8 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
 {
     for (int ii = 0; ii < transfer->valid_length; ii+=2)
     {
-        if ( t < 0.0000005 ) // 500 ns
+        //if ( t < 0.00000004 ) // 40 ns (1 samples)
+        if( ii == 0 )
         {
             /*
             double i = 127.0 * cos( 2.0 * PI * df * t );  // I
