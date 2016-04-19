@@ -14,11 +14,11 @@
 
 HackRFDevice hackrf;
 
-uint64_t fc_hz      = 2480e6; // center freq
-double   fs_hz      = 20e6;   // sample rate
+uint64_t fc_hz      = 2490e6; // center freq
+double   fs_hz      = 8e6;   // sample rate
 uint32_t lna_gain   = 0;
-uint8_t  amp_enable = 1;
-uint32_t txvga_gain = 47;
+uint8_t  amp_enable = 0;
+uint32_t txvga_gain = 0;
 
 
 void signal_handler(int s)
@@ -35,9 +35,15 @@ void signal_handler(int s)
 //262144
 double t = 0.0;
 double dt = 1.0/fs_hz;
-double df = 4000000.0; // 4MHz baseband CW
+double df = 1.5e6; // 1MHz baseband CW
+double pri = 1e-3;
+double pw = 1e-3;
+double amp = 100;
+double chirp_width = df + 200e3;
+double slopeFactor = (chirp_width - df)/(2.0*pw);
 
-//#define SAVE_FILE
+
+#define SAVE_FILE
 #ifdef SAVE_FILE
 int write_file = 1;
 std::ofstream ofile("tx.csv", std::ofstream::out);
@@ -47,21 +53,31 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
 {
     for (int ii = 0; ii < transfer->valid_length; ii+=2)
     {
-        if ( t < 0.00000004 ) // 40 ns (1 samples)
-        //if( ii == 0 )
+        double i = 0.0;
+        double q = 0.0;
+        if ( t < pw ) // 40 ns (1 samples)
         {
-            /*
-            double i = 127.0 * cos( 2.0 * PI * df * t );  // I
-            double q = 127.0 * sin( 2.0 * PI * df * t );  // Q
             
+            
+            i = amp * cos( 2.0 * PI * ((df*t)+(slopeFactor*pow(t,2))) );  // I
+            q = amp * sin( 2.0 * PI * ((df*t)+(slopeFactor*pow(t,2))) );  // Q
+            /*
+            if ( t > pw / 2.0 )
+                dftemp = df * 2.0;
+            else
+                dftemp = df;
+            
+            i = amp * cos( 2.0 * PI * (0.0) * t );  // I
+            q = amp * sin( 2.0 * PI * (0.0) * t );  // Q
+            */
             uint8_t i8 = uint8_t(i);
             uint8_t q8 = uint8_t(q);
             
             transfer->buffer[ii+0] = i8;
             transfer->buffer[ii+1] = q8;
-            */
-            transfer->buffer[ii+0] = 127;
-            transfer->buffer[ii+1] = 127;
+            
+            //transfer->buffer[ii+0] = amp;
+            //transfer->buffer[ii+1] = amp;
         }
         else
         {
@@ -72,13 +88,16 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
 #ifdef SAVE_FILE
         if ( write_file == 1 )
         {
-            ofile << unsigned(transfer->buffer[ii+0]) << "," 
-                  << unsigned(transfer->buffer[ii+1]) << std::endl;
+            ofile << t << ","
+//                  << unsigned(transfer->buffer[ii+1]) << ","
+//                  << unsigned(transfer->buffer[ii+1]) << std::endl;
+                  << i << ","
+                  << q << std::endl;
         }
 #endif
         
         t = t+dt;
-        if ( t >= 1.0 )
+        if ( t >= pri )
         {
             t = 0.0;
         }
@@ -125,7 +144,7 @@ int main()
     hackrf.start_Tx( sample_block_cb_fn, (void*)(NULL) );
 
     //  Wait a while
-    sleep(300);
+    sleep(3000000);
     
     return 0;
 }
