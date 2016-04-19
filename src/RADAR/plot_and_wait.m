@@ -30,7 +30,7 @@ while 1
     amp  = abs(iq);
     
     
-    thresh = 20;
+    thresh = 100;
     inds = find(amp>thresh);
 
     if length(inds) == 0

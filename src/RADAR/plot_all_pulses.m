@@ -12,7 +12,7 @@ f = f + fc;
 f_mhz = f/1e6;
 
 fd = fopen(filename,'r');
-data = fread(fd, 'int8');
+data = fread(fd, 20e7, 'int8');
 fclose(fd);
 
 data = reshape(data, 2, []);
@@ -44,7 +44,7 @@ pre_time  = 0.0000005; % seconds before the detection
 post_time = 0.000003;  % seconds after the detection
 window_size_samples = (pre_time + post_time) * fs;
 
-stack_size = 50;
+stack_size = 500;
 stack_index = 1;
 
 data = [];
@@ -79,7 +79,7 @@ end
 subplot(211)
 surf(data)
 view( 20, 15 )
-title(['Amplitude of ' num2str(stack_size) ' pulses'])
+title(['Amplitude of ' num2str(stack_index) ' pulses'])
 
 subplot(212)
 plot(frame_d, mean(data), '.-')
@@ -88,14 +88,14 @@ hold on
 % Plot the threshold
 plot( [frame_d(1) frame_d(end)], [ thresh thresh ], 'r')
 xlabel('Distance (feet)');
-title(['Mean of ' num2str(stack_size) ' pulse sample values'])
+title(['Mean of ' num2str(stack_index) ' pulse sample values'])
 
 
 % Wait for the figure to close
 while ishandle(fig)
     pause(0.1)
 end
-exit
+%exit
 
 
 

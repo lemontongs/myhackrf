@@ -47,8 +47,8 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
 {
     for (int ii = 0; ii < transfer->valid_length; ii+=2)
     {
-        //if ( t < 0.00000004 ) // 40 ns (1 samples)
-        if( ii == 0 )
+        if ( t < 0.00000004 ) // 40 ns (1 samples)
+        //if( ii == 0 )
         {
             /*
             double i = 127.0 * cos( 2.0 * PI * df * t );  // I
