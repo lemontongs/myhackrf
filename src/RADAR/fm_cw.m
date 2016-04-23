@@ -3,7 +3,7 @@ clear; close all; clc
 
 %% Read from file
 
-!hackrf_transfer -r rx.dat -d 22be1 -f 2480000000 -a 1 -l 40 -g 0 -s 8000000 -n 4000000
+!hackrf_transfer -r rx.dat -d 22be1 -f 2490000000 -a 1 -l 40 -g 0 -s 8000000 -n 4000000
 filename = 'rx.dat';
 fd = fopen(filename,'r');
 data = fread(fd, 'int8');
@@ -34,30 +34,34 @@ win = kaiser(N+1, Beta);
 b  = fir1(N, Fc/(fs/2), 'low', win, flag);
 t = 0:1/fs:length(data)/fs; t(end) = [];
 
-data = data.*exp(j*2*pi*(-1.6e6)*t); % shifted version
+data = data.*exp(1i * 2 * pi * (-1.6e6) * t); % shifted version
 data = filtfilt(b,1, data);
 
-figure(100); plot(linspace(-fs/2,fs/2,length(data)), 10*log10(fftshift(abs(fft(data)))));
-figure(101); plot(t,real(data));
+%figure(100); plot(linspace(-fs/2,fs/2,length(data)), 10*log10(fftshift(abs(fft(data)))));
+%figure(101); plot(t,real(data));
 
 % match filter
 slopeFactor = (chirp_width)/(2 * pw);
 t2 = 0:1/fs:pri-(1/fs);
-% match_signal = 100 * exp(j * 2.0 * pi * ((df*t)+(slopeFactor*(t.^2))));
-match_signal=  100 * exp(j * 2   * pi * ( t2*(-chirp_width/2) + slopeFactor*t2.^2));
+match_signal = 100 * exp(1i * 2.0 * pi * ((df*t)+(slopeFactor*(t.^2))));
 
-% data = data(3799198:end);
+% Apply the match filter
 corrResult = xcorr(data,match_signal);
 corrResult(1:length(data)-1) = [];
 
-figure(102); plot(linspace(-fs/2,fs/2,length(corrResult)), 10*log10(fftshift(abs(fft(corrResult)))));
-figure(103); plot(10*log10(abs(corrResult)));
-
 [pks,locs] = findpeaks(abs(corrResult), 'MINPEAKDISTANCE', 7500);
 
+%figure(102); plot(linspace(-fs/2,fs/2,length(corrResult)), 10*log10(fftshift(abs(fft(corrResult))))); title('Matched Filter Response')
+figure(103);
+plot(10*log10(abs(corrResult)));
+hold on
+plot(locs,10*log10(abs(pks)),'r*')
+title('Matched Filter Response')
+
+% Convert the detected waveforms into the pulsed-doppler form
 pulses = [];
 nsamples = pri*fs;
-for k =1:length(locs)-1
+for k =1:(length(locs)-5)
     pulses(k,:) = data(locs(k):locs(k)+nsamples-1);
 end
 
