@@ -17,8 +17,8 @@ HackRFDevice hackrf;
 uint64_t fc_hz      = 2490e6; // center freq
 double   fs_hz      = 8e6;   // sample rate
 uint32_t lna_gain   = 0;
-uint8_t  amp_enable = 0;
-uint32_t txvga_gain = 30;
+uint8_t  amp_enable = 1;
+uint32_t txvga_gain = 45;
 
 
 void signal_handler(int s)
@@ -29,19 +29,42 @@ void signal_handler(int s)
 }
 
 
+std::size_t waveform_index = 0;
+std::vector<uint8_t> waveform_i;
+std::vector<uint8_t> waveform_q;
+
 //
 // Callback function for tx samples
 //
-//262144
-double t = 0.0;
-double dt = 1.0/fs_hz;
-double df = 1.5e6; // 1MHz baseband CW
-double pri = 1e-3;
-double pw = 1e-3;
-double amp = 100;
-double chirp_width = df + 200e3;
-double slopeFactor = (chirp_width - df)/(2.0*pw);
+// 262144 samples transfered at a time
+//
+int sample_block_cb_fn(hackrf_transfer* transfer)
+{
+    for (int ii = 0; ii < transfer->valid_length; ii+=2)
+    {
+        transfer->buffer[ii+0] = waveform_i[waveform_index];
+        transfer->buffer[ii+1] = waveform_q[waveform_index];
+        waveform_index++;
+        if ( waveform_index > waveform_i.size() )
+            waveform_index = 0;
 
+    }
+    
+    return 0;
+}
+
+
+double pri = 0.001;
+double pw = pri;
+double amp = 127.0 * sqrt(2.0) / 2.0;
+double chirp_start = 1.5e6;
+double chirp_width = 0.2e6;
+double chirp_stop = chirp_start + chirp_width;
+double slopeFactor = (chirp_stop - chirp_start)/(2.0*pw);
+double dt = 1.0/fs_hz;
+
+void createWaveform()
+{
 
 #define SAVE_FILE
 #ifdef SAVE_FILE
@@ -49,71 +72,32 @@ int write_file = 1;
 std::ofstream ofile("tx.csv", std::ofstream::out);
 #endif
 
-int sample_block_cb_fn(hackrf_transfer* transfer)
-{
-    for (int ii = 0; ii < transfer->valid_length; ii+=2)
+    double t = 0.0;
+    while ( t <= pw )
     {
-        double i = 0.0;
-        double q = 0.0;
-        if ( t < pw ) // 40 ns (1 samples)
-        {
-            
-            
-            i = amp * cos( 2.0 * PI * ((df*t)+(slopeFactor*pow(t,2))) );  // I
-            q = amp * sin( 2.0 * PI * ((df*t)+(slopeFactor*pow(t,2))) );  // Q
-            /*
-            if ( t > pw / 2.0 )
-                dftemp = df * 2.0;
-            else
-                dftemp = df;
-            
-            i = amp * cos( 2.0 * PI * (0.0) * t );  // I
-            q = amp * sin( 2.0 * PI * (0.0) * t );  // Q
-            */
-            uint8_t i8 = uint8_t(i);
-            uint8_t q8 = uint8_t(q);
-            
-            transfer->buffer[ii+0] = i8;
-            transfer->buffer[ii+1] = q8;
-            
-            //transfer->buffer[ii+0] = amp;
-            //transfer->buffer[ii+1] = amp;
-        }
-        else
-        {
-            transfer->buffer[ii+0] = 0;
-            transfer->buffer[ii+1] = 0;
-        }
+        double i = amp * cos( 2.0 * PI * ((chirp_start * t)+(slopeFactor*pow(t,2))) );  // I
+        double q = amp * sin( 2.0 * PI * ((chirp_start * t)+(slopeFactor*pow(t,2))) );  // Q
+
+        uint8_t i8 = uint8_t(i);
+        uint8_t q8 = uint8_t(q);
+
+        waveform_i.push_back(i8);
+        waveform_q.push_back(q8);
         
 #ifdef SAVE_FILE
-        if ( write_file == 1 )
-        {
-            ofile << t << ","
+        ofile << t << ","
 //                  << unsigned(transfer->buffer[ii+1]) << ","
 //                  << unsigned(transfer->buffer[ii+1]) << std::endl;
-                  << i << ","
-                  << q << std::endl;
-        }
+        << i << ","
+        << q << std::endl;
 #endif
-        
+
         t = t+dt;
-        if ( t >= pri )
-        {
-            t = 0.0;
-        }
     }
-    
-    
 
 #ifdef SAVE_FILE
-    if ( write_file == 1 )
-    {
-        write_file = 0;
-        ofile.close();
-    }
+    ofile.close();
 #endif
-    
-    return 0;
 }
 
 
@@ -128,7 +112,8 @@ int main()
     sigemptyset(&sigIntHandler.sa_mask);
     sigIntHandler.sa_flags = 0;
     sigaction(SIGINT, &sigIntHandler, NULL);
-
+    
+    createWaveform();
     
     if ( ! hackrf.initialize( "23ec7" ) )
     {
