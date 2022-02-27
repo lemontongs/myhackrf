@@ -15,6 +15,7 @@ public:
     HackRFDevice();
     ~HackRFDevice();
     
+    bool initialize();
     bool initialize(const char* const desired_serial_number);
     bool cleanup();
     

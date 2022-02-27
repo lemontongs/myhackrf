@@ -7,7 +7,7 @@ PROTOC = protoc
 
 # Compiler flags
 CXXFLAGS=-I.
-PROTOCFLAGS=--proto_path=. --cpp_out=.
+PROTOCFLAGS=--proto_path=. --cpp_out=. --python_out=.
 
 # Items
 PROTOS=$(wildcard *.proto)

@@ -16,9 +16,8 @@ namespace utilities
     {
         double fs_over_N = double(fs)/double(N);
         packet.clear_freq_bins_mhz();
-        for (int ii = (-N/2); ii < (N/2); ii++)
-            packet.add_freq_bins_mhz( uint64_t( double(ii) * fs_over_N ) + fc );
-        
+        for (int ii = (-1.0 * double(N)/2.0); ii < (double(N)/2.0); ii++)
+            packet.add_freq_bins_mhz( int64_t( double(ii) * fs_over_N ) + fc );
     }
 
     inline double hamming_window( uint32_t N, double n )

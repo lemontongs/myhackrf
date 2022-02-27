@@ -26,6 +26,11 @@ int  HackRFDevice::get_mode()
     return m_device_mode;
 }
 
+bool HackRFDevice::initialize()
+{
+    return initialize(nullptr);
+}
+
 bool HackRFDevice::initialize(const char* const desired_serial_number)
 {
     uint8_t board_id = BOARD_ID_INVALID;
@@ -35,12 +40,23 @@ bool HackRFDevice::initialize(const char* const desired_serial_number)
     if ( ! check_error( hackrf_init() ) )
         return false;
 
-    if ( ! check_error( hackrf_open_by_serial( desired_serial_number, &m_device ) ) )
+    if ( nullptr == desired_serial_number )
     {
-        hackrf_exit();
-        return false;
+        if ( ! check_error( hackrf_open( &m_device ) ) )
+        {
+            hackrf_exit();
+            return false;
+        }
     }
-
+    else
+    {
+        if ( ! check_error( hackrf_open_by_serial( desired_serial_number, &m_device ) ) )
+        {
+            hackrf_exit();
+            return false;
+        }
+    }
+    
     std::cout << "HackRFDevice: Found HackRF board" << std::endl;
 
     if ( ! check_error( hackrf_board_id_read( m_device, &board_id ) ) )

@@ -17,6 +17,8 @@ bool isRunning = true;
 bool led_is_on = false;
 uint64_t fc = 0;
 double fs = 0.0;
+double thresh = 0.0;
+uint32_t print_count = 0;
 
 //
 // Returns time (seconds) since program start
@@ -25,7 +27,7 @@ double get_duration()
 {
     struct timespec now;
     clock_gettime( CLOCK_REALTIME, &now );
-    
+
     return double(now.tv_sec - program_start.tv_sec) + ( double(now.tv_nsec - program_start.tv_nsec) / 1e9 );
 }
 
@@ -64,7 +66,7 @@ void process_data( Packet &p, zmq::socket_t* blink_interface, SDRReceiver* recei
     //
     // Find the peak in the target frequency range
     //
-    for (int mm = 0; mm < p.signal_size(); mm++)
+    for (int mm = 0; mm < monitor_ranges.size(); mm++)
     {
         for (int ii = 0; ii < p.signal_size(); ii++)
         {
@@ -76,19 +78,19 @@ void process_data( Packet &p, zmq::socket_t* blink_interface, SDRReceiver* recei
     }
 
     // threshold is some constant over the mean
-    double threshold = p.mean_db() + 20.0;
+    double threshold = p.mean_db() + thresh;
     double signal_to_noise = peak - threshold;
-    
+
     // Blink the LED (and print sone info) if we have detected a signal
     if ( signal_to_noise > 0.0 )
         blink_on( *blink_interface );
     else
         blink_off( *blink_interface );
-    
-    
-    
+
     if ( signal_to_noise > 0.0 )
     {
+        if ( print_count == 0 )
+            std::cout << " Time                     Mean  Thresh  Peak  SNR" << std::endl;
         std::cout << std::left << std::setw(8) << get_duration();
         for (int mm = 0; mm < monitor_ranges.size(); mm++)
         {
@@ -106,8 +108,8 @@ void process_data( Packet &p, zmq::socket_t* blink_interface, SDRReceiver* recei
                   << " " << std::left << std::setw(8) << std::setprecision(4) << peak
                   << " " << std::left << std::setw(8) << std::setprecision(4) << signal_to_noise
                   << std::endl;
+        print_count = ( print_count + 1 ) % 20;
     }
-    
 }
 
 //
@@ -118,13 +120,31 @@ void parse_args(int argc, char* argv[])
     for (int aa = 0; aa < argc; aa++)
     {
         std::string arg( argv[aa] );
-        
+
         if ( arg == "-h" || arg == "--help")
         {
             std::cout << "Usage: " << argv[0] << " -c <center frequency> -s <sample rate> -r <low frequency> <high frequency>" << std::endl;
             std::cout << "    -c <center frequency hz>    center frequencie to tune to" << std::endl;
             std::cout << "    -s <sample rate hz>         device sample rate to use" << std::endl;
             std::cout << "    -r <low freq> <high freq>   low and high are frequency (Hz) ranges to monitor (can be many -r specifications" << std::endl << std::endl;
+        }
+        else if ( arg == "-t" )
+        {
+            if (aa + 1 >= argc)
+            {
+                std::cout << "Missing threshold!" << std::endl;
+                exit(1);
+            }
+            
+            // threshold argument
+            std::istringstream ss(argv[aa+1]);
+            if (!(ss >> thresh))
+            {
+                std::cout << "ERROR: Invalid threshold argument! '" << argv[aa+1] << "'" << std::endl;
+                exit(1);
+            }
+            
+            aa += 1;
         }
         else if ( arg == "-c" )
         {
