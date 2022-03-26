@@ -67,6 +67,8 @@ void* thread_func(void* args)
             rtl_obj->m_callback_args, 
             0, 
             0 ) ); // Blocking
+    
+    return nullptr;
 }
 
 bool RTLSDRDevice::start_Rx( rtlsdr_read_async_cb_t callback, void* args )

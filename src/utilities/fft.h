@@ -2,6 +2,7 @@
 #ifndef FFT_H
 #define FFT_H
 
+#include "RFDevice.h"
 #include "packet.pb.h"
 
 #include <fftw3.h>
@@ -25,7 +26,7 @@ namespace utilities
     //
     // fft
     //
-    Packet fft( uint8_t * buffer, int buffer_size, int num_fft_bins, double fs, uint64_t fc );
+    Packet fft( SampleChunk &buffer, int num_fft_bins, double fs, uint64_t fc );
 }
 
 #endif /* FFT_H */

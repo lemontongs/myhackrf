@@ -51,9 +51,9 @@ int tx_cb_fn(hackrf_transfer* transfer)
 //
 // Callback function for Rx samples
 //
-int rx_cb_fn(hackrf_transfer* transfer)
+int rx_cb_fn(SampleChunk* samples, void* args)
 {
-    std::cout << "got a packet!" << std::endl;
+    std::cout << "got a packet with " << samples->size() << " samples!" << std::endl;
     return 0;
 }
 

@@ -6,6 +6,8 @@
 
 QT       += core gui
 
+CONFIG += qwt
+
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = GUI
@@ -16,16 +18,14 @@ LIBS += -L/usr/local/lib/ -lzmq -lprotobuf -lpthread
 SOURCES += main.cpp\
         mainwindow.cpp \
         receiver.cpp \
-        ../protobuffers/packet.pb.cc
+        ../../build/src/protobuffers/packet.pb.cc
 
 HEADERS  += mainwindow.h \
-        receiver.h \
-        zhelpers.h \
-        ../protobuffers/packet.pb.h
+        receiver.h
 
-INCLUDEPATH += ../protobuffers
+INCLUDEPATH += ../protobuffers ../utilities ../../build/src/protobuffers/
 
 FORMS    += mainwindow.ui
 
-include( /usr/local/qwt-6.1.2/features/qwt.prf )
+#include( /usr/local/qwt-6.1.2/features/qwt.prf )
 

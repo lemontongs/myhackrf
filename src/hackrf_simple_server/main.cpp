@@ -37,10 +37,10 @@ void signal_handler(int s)
 //
 // Callback function for rx samples
 //
-int sample_block_cb_fn(hackrf_transfer* transfer)
+int sample_block_cb_fn(SampleChunk* samples, void* args)
 {
     // send the packet out over the network
-    Socket* client = (Socket*)transfer->rx_ctx;
+    Socket* client = (Socket*)args;
     
     if ( ! client->is_valid() )
     {
@@ -50,26 +50,26 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
     }
     
     
-    for (int ii = 0; ii < 10; ii+=2)
+    for (int ii = 0; ii < 10; ii++)
     {
-        std::cout << int(transfer->buffer[ii]);
+        std::cout << (*samples).at(ii).real() << ", " << (*samples).at(ii).imag() << "  ";
     }
     std::cout << std::endl << std::flush;
     
-    if ( ! client->send( transfer->buffer, transfer->valid_length ) )
-    {
-        int e = errno;
-        if ( e == EAGAIN )
-        {
-            std::cout << "U" << std::flush;
-        }
-        else
-        {
-            std::cout << "Could not send to client: (" << e << ") " << strerror(e) << std::endl;
-            transfer_ok = false;
-        }
-        return 0;
-    }
+    // if ( ! client->send( transfer->buffer, transfer->valid_length ) )
+    // {
+    //     int e = errno;
+    //     if ( e == EAGAIN )
+    //     {
+    //         std::cout << "U" << std::flush;
+    //     }
+    //     else
+    //     {
+    //         std::cout << "Could not send to client: (" << e << ") " << strerror(e) << std::endl;
+    //         transfer_ok = false;
+    //     }
+    //     return 0;
+    // }
     
     return 0;
 }
@@ -90,9 +90,9 @@ int main()
       
     if ( hackrf.initialize( "22be1" /*"23ec7"*/ ) )
     {
-        hackrf.tune( 5981e6 );
+        hackrf.set_center_freq( 5981e6 );
         hackrf.set_sample_rate( fs_hz );
-        hackrf.set_lna_gain( lna_gain );
+        hackrf.set_rx_gain( lna_gain );
         hackrf.set_amp_enable( amp_enable );
         hackrf.set_txvga_gain( txvga_gain );
         

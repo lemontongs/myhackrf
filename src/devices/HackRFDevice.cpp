@@ -14,6 +14,8 @@ HackRFDevice::HackRFDevice()
     m_antenna_enable = 0;
     m_rxvga_gain     = 0;
     m_txvga_gain     = 0;
+    m_rx_gain        = 0;
+    m_tx_gain        = 0;
 }
 
 HackRFDevice::~HackRFDevice()
@@ -73,7 +75,7 @@ bool HackRFDevice::initialize(const char* const desired_serial_number)
     //
     // Set device parameters
     //
-    if ( ! tune( m_fc_hz ) ||
+    if ( ! set_center_freq( m_fc_hz ) ||
          ! set_sample_rate( m_fs_hz ) ||
          ! set_lna_gain( m_lna_gain ) ||
          ! set_amp_enable( m_amp_enable ) ||
@@ -87,12 +89,34 @@ bool HackRFDevice::initialize(const char* const desired_serial_number)
     return true;
 }
 
-bool HackRFDevice::start_Rx( hackrf_sample_block_cb_fn callback, void* args = NULL )
+int convert_to_device_rx_sample_block_cb_fn(hackrf_transfer *transfer)
+{
+    std::pair<device_sample_block_cb_fn*, void**>* callback_args_pair = (std::pair<device_sample_block_cb_fn*, void**>*)(transfer->rx_ctx);
+    device_sample_block_cb_fn* callback_function = callback_args_pair->first;
+    void* callback_args = *(callback_args_pair->second);
+
+    SampleChunk sc;
+    sc.reserve(transfer->valid_length/2);
+
+    for (int ii = 0; ii < transfer->valid_length; ii+=2)
+    {
+        sc.push_back( std::complex<double>( ( double( transfer->buffer[ii+0] + uint8_t(128) ) - double(128) ) / double(128),
+                                            ( double( transfer->buffer[ii+1] + uint8_t(128) ) - double(128) ) / double(128) ) );
+        
+    }
+    
+    return (*callback_function)(&sc, callback_args);
+}
+
+bool HackRFDevice::start_Rx( device_sample_block_cb_fn callback, void* args = NULL )
 {
     if ( m_is_initialized && m_device_mode == STANDBY_MODE )
     {
         std::cout << "HackRFDevice: Starting Rx" << std::endl;
-        if ( check_error( hackrf_start_rx( m_device, callback, args ) ) )
+
+        std::pair<device_sample_block_cb_fn*, void**> callback_args = std::make_pair(&callback, &args);
+    
+        if ( check_error( hackrf_start_rx( m_device, convert_to_device_rx_sample_block_cb_fn, (void*)(&callback_args) ) ) )
         {
             m_device_mode = RX_MODE;
             return true;
@@ -117,12 +141,25 @@ bool HackRFDevice::stop_Rx()
     return false;
 }
 
-bool HackRFDevice::start_Tx( hackrf_sample_block_cb_fn callback, void* args = NULL )
+int convert_to_device_tx_sample_block_cb_fn(hackrf_transfer *transfer)
+{
+    auto device_callback_and_args = (std::pair<device_sample_block_cb_fn, void*>*)transfer->tx_ctx;
+    
+    SampleChunk sc;
+    device_callback_and_args->first(&sc, device_callback_and_args->second);
+
+    // Do something with transfer->buffer
+
+    return 0;
+}
+
+bool HackRFDevice::start_Tx( device_sample_block_cb_fn callback, void* args = NULL )
 {
     if ( m_is_initialized && m_device_mode == STANDBY_MODE )
     {
         std::cout << "HackRFDevice: Starting Tx" << std::endl;
-        if ( check_error( hackrf_start_tx( m_device, callback, args ) ) )
+        auto callback_args = std::make_pair(callback, args);
+        if ( check_error( hackrf_start_tx( m_device, convert_to_device_tx_sample_block_cb_fn, (void*)&callback_args ) ) )
         {
             m_device_mode = TX_MODE;
             return true;
@@ -147,7 +184,7 @@ bool HackRFDevice::stop_Tx()
     return false;
 }
 
-bool HackRFDevice::tune( uint64_t fc_hz )
+bool HackRFDevice::set_center_freq( double fc_hz )
 {
     if ( m_is_initialized )
     {
@@ -229,6 +266,15 @@ bool HackRFDevice::set_lna_gain( uint32_t lna_gain )
     }
     return false;
 }
+bool HackRFDevice::set_rx_gain( double rx_gain )
+{
+    return set_rxvga_gain( uint32_t(rx_gain) );
+}
+
+bool HackRFDevice::set_tx_gain( double tx_gain )
+{
+    return set_txvga_gain( uint32_t(tx_gain) );
+}
 
 bool HackRFDevice::set_rxvga_gain( uint32_t rxvga_gain )
 {
@@ -240,6 +286,7 @@ bool HackRFDevice::set_rxvga_gain( uint32_t rxvga_gain )
             if ( check_error( hackrf_set_vga_gain( m_device, rxvga_gain ) ) )
             {
                 m_rxvga_gain = rxvga_gain;
+                m_rx_gain = double(m_rxvga_gain);
                 return true;
             }
         }
@@ -259,6 +306,7 @@ bool HackRFDevice::set_txvga_gain( uint32_t txvga_gain )
             if ( check_error( hackrf_set_txvga_gain( m_device, txvga_gain ) ) )
             {
                 m_txvga_gain = txvga_gain;
+                m_tx_gain = double(m_txvga_gain);
                 return true;
             }
         }

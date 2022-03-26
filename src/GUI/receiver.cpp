@@ -10,8 +10,8 @@ Receiver::Receiver()
     isInitialized = false;
     data_port = "5555";
     comm_port = "5556";
-    data_target = "tcp://odroid:" + data_port;
-    comm_target = "tcp://odroid:" + comm_port;
+    data_target = "tcp://localhost:" + data_port;
+    comm_target = "tcp://localhost:" + comm_port;
 
     // Setup the data receiver
     comm_context = new zmq::context_t(1);

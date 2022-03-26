@@ -28,10 +28,10 @@ namespace utilities
     //
     // fft
     //
-    Packet fft( uint8_t * buffer, int buffer_size, int num_fft_bins, double fs, uint64_t fc )
+    Packet fft( SampleChunk &buffer, int num_fft_bins, double fs, uint64_t fc )
     {
         Packet result;
-        result.set_num_samples( buffer_size/2 );
+        result.set_num_samples( buffer.size() );
         result.set_num_bins( num_fft_bins );
         calcFrequencyBins( result, num_fft_bins, fs, fc );
         
@@ -39,13 +39,10 @@ namespace utilities
         in = (fftw_complex*) fftw_malloc(sizeof(fftw_complex)*result.num_samples());
         out = (fftw_complex*) fftw_malloc(sizeof(fftw_complex)*result.num_bins());
 
-        for (int ii = 0; ii < buffer_size; ii+=2)
+        for (int ii = 0; ii < buffer.size(); ii++)
         {
-            in[ii/2][0] = ( double( buffer[ii+0] + uint8_t(128) ) - double(128) ) / double(128);
-            in[ii/2][1] = ( double( buffer[ii+1] + uint8_t(128) ) - double(128) ) / double(128);
-            
-            in[ii/2][0] = in[ii/2][0] * hamming_window( result.num_samples(), ii );
-            in[ii/2][1] = in[ii/2][1] * hamming_window( result.num_samples(), ii );
+            in[ii][0] = buffer[ii].real() * hamming_window( result.num_samples(), ii );
+            in[ii][1] = buffer[ii].imag() * hamming_window( result.num_samples(), ii );
         }
         
         fftw_plan my_plan;
