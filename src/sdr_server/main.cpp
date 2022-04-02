@@ -2,7 +2,7 @@
 #include "fft.h"
 #include "HackRFDevice.h"
 #include "packet.pb.h"
-#include "zhelpers.h"
+#include "zhelpers.hpp"
 
 #include <signal.h>
 #include <stdio.h>
@@ -15,6 +15,7 @@
 // Device driver
 RFDevice* rf_device;
 std::string sdr_type;
+Packet_PacketType rx_mode = Packet_PacketType_FFT;
 
 bool g_shutdown_requested = false;
 
@@ -34,7 +35,7 @@ int sample_block_cb_fn(SampleChunk* samples, void* args)
     zmq::socket_t * publisher = (zmq::socket_t *)args;
     
     Packet packet;
-    if (1)
+    if (rx_mode == Packet_PacketType_FFT)
     {
         packet = \
             utilities::fft( *samples,
@@ -47,13 +48,23 @@ int sample_block_cb_fn(SampleChunk* samples, void* args)
     else
     {
         packet.set_type(Packet_PacketType_RAW);
+        packet.set_num_samples( samples->size() );
+        packet.set_num_bins( 0 );
+        packet.set_mean_db( 0.0 );
+        packet.set_peak_db( -9999.0 );
+        packet.set_low_db( 9999.0 );
+        packet.set_peak_bin_index( 0 );
+        packet.clear_signal();
         for (int ii = 0; ii < samples->size(); ii++)
         {
             packet.add_signal((*samples).at(ii).real());
             packet.add_signal((*samples).at(ii).imag());
         }
     }
-        
+
+    packet.set_fc(rf_device->get_center_freq());
+    packet.set_fs(rf_device->get_sample_rate());
+    
     std::string data;
     packet.SerializeToString(&data);
     s_send( *publisher, data );
@@ -64,11 +75,11 @@ int sample_block_cb_fn(SampleChunk* samples, void* args)
 //
 // Handle received message. Return false to exit main loop.
 //
-void process_messages( zmq::socket_t & comm_sock )
+void process_messages( zmq::socket_t* comm_sock )
 {
     while (!g_shutdown_requested)
     {
-        std::string message = s_recv( comm_sock );
+        std::string message = s_recv( *comm_sock );
         
         std::cout << "sdr_server: Received: '" << message << "'" << std::endl;
 
@@ -80,7 +91,7 @@ void process_messages( zmq::socket_t & comm_sock )
 
         if ( fields.size() < 1 )
         {
-            s_send( comm_sock, std::string("sdr_server: ERROR: invalid request") );
+            s_send( *comm_sock, std::string("sdr_server: ERROR: invalid request") );
             continue;
         }
         
@@ -89,7 +100,7 @@ void process_messages( zmq::socket_t & comm_sock )
         {
             std::stringstream ss;
             ss << rf_device->get_center_freq();
-            s_send( comm_sock, ss.str() );
+            s_send( *comm_sock, ss.str() );
             continue;
         }
         
@@ -97,14 +108,14 @@ void process_messages( zmq::socket_t & comm_sock )
         {
             std::stringstream ss;
             ss << rf_device->get_sample_rate();
-            s_send( comm_sock, ss.str() );
+            s_send( *comm_sock, ss.str() );
             continue;
         }
         if ( fields[0] == "get-rx-gain" )
         {
             std::stringstream ss;
             ss << rf_device->get_rx_gain();
-            s_send( comm_sock, ss.str() );
+            s_send( *comm_sock, ss.str() );
             continue;
         }
         
@@ -112,7 +123,7 @@ void process_messages( zmq::socket_t & comm_sock )
         // ACTIONS
         if ( fields[0] == "quit" )
         {
-            s_send( comm_sock, std::string("OK") );
+            s_send( *comm_sock, std::string("OK") );
             return;
         }
         
@@ -123,15 +134,15 @@ void process_messages( zmq::socket_t & comm_sock )
             if (!(ss >> new_fc_hz))
             {
                 std::cout << "sdr_server: tune failed: '" << fields[1] << "'" << std::endl;
-                s_send( comm_sock, std::string("ERROR: invalid tune argument") );
+                s_send( *comm_sock, std::string("ERROR: invalid tune argument") );
             }
             else if ( rf_device->set_center_freq( new_fc_hz ) )
             {
                 std::cout << "sdr_server: tuned to: " << new_fc_hz << std::endl;
-                s_send( comm_sock, std::string("OK") );
+                s_send( *comm_sock, std::string("OK") );
             }
             else
-                s_send( comm_sock, std::string("ERROR: tune failed") );
+                s_send( *comm_sock, std::string("ERROR: tune failed") );
             continue;
         }
         
@@ -142,15 +153,15 @@ void process_messages( zmq::socket_t & comm_sock )
             if (!(ss >> new_fs_hz))
             {
                 std::cout << "sdr_server: set-fs failed: '" << fields[1] << "'" << std::endl;
-                s_send( comm_sock, std::string("ERROR: invalid sample rate argument") );
+                s_send( *comm_sock, std::string("ERROR: invalid sample rate argument") );
             }
             else if ( rf_device->set_sample_rate( new_fs_hz ) )
             {
                 std::cout << "sdr_server: sample rate set to: " << new_fs_hz << std::endl;
-                s_send( comm_sock, std::string("OK") );
+                s_send( *comm_sock, std::string("OK") );
             }
             else
-                s_send( comm_sock, std::string("ERROR: set-fs failed") );
+                s_send( *comm_sock, std::string("ERROR: set-fs failed") );
             continue;
         }
         
@@ -161,15 +172,36 @@ void process_messages( zmq::socket_t & comm_sock )
             if (!(ss >> new_rx_gain))
             {
                 std::cout << "sdr_server: set-rx-gain failed: '" << fields[1] << "'" << std::endl;
-                s_send( comm_sock, std::string("ERROR: invalid rx gain argument") );
+                s_send( *comm_sock, std::string("ERROR: invalid rx gain argument") );
             }
             else if ( rf_device->set_rx_gain( new_rx_gain ) )
             {
                 std::cout << "sdr_server: rx gain set to: " << new_rx_gain << std::endl;
-                s_send( comm_sock, std::string("OK") );
+                s_send( *comm_sock, std::string("OK") );
             }
             else
-                s_send( comm_sock, std::string("ERROR: set-rx-gain failed") );
+                s_send( *comm_sock, std::string("ERROR: set-rx-gain failed") );
+            continue;
+        }
+
+        if ( fields[0] == "set-rx-mode" && fields.size() >= 2 )
+        {
+            std::istringstream ss(fields[1]);
+            std::string new_rx_mode;
+            if (!(ss >> new_rx_mode))
+            {
+                std::cout << "sdr_server: set-rx-mode failed: '" << fields[1] << "'" << std::endl;
+                s_send( *comm_sock, std::string("ERROR: invalid rx mode argument") );
+            }
+            else
+            {
+                rx_mode = Packet_PacketType_FFT;
+                if (new_rx_mode == "iq")
+                    rx_mode = Packet_PacketType_RAW;
+
+                std::cout << "sdr_server: rx mode set to: " << new_rx_mode << "  " << rx_mode << std::endl;
+                s_send( *comm_sock, std::string("OK") );
+            }
             continue;
         }
     }
@@ -251,7 +283,7 @@ int main(int argc, char* argv[])
 
     if ( rf_device->initialize() )
     {
-        rf_device->set_sample_rate( 1000000 );
+        rf_device->set_sample_rate( 8000000 );
         rf_device->set_center_freq( 433900000 );
         rf_device->set_rx_gain( 40 );
         
@@ -259,7 +291,7 @@ int main(int argc, char* argv[])
         rf_device->start_Rx( sample_block_cb_fn, (void*)(&publisher) );
         
         // Listen for messages, this blocks until a "quit" is received
-        process_messages( receiver );
+        process_messages( &receiver );
     }
 
     rf_device->cleanup();

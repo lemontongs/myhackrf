@@ -35,7 +35,8 @@ void signal_handler(int s)
 double t = 0.0;
 double dt = 1/fs_hz;
 
-int sample_block_cb_fn(hackrf_transfer* transfer)
+//int sample_block_cb_fn(hackrf_transfer* transfer)
+int device_sample_block_cb(SampleChunk* samples, void* args)
 {
     std::cout << "P " << std::flush;
     
@@ -43,11 +44,11 @@ int sample_block_cb_fn(hackrf_transfer* transfer)
     int ii = 0;
     double i,q;
     
-    while (ii < transfer->valid_length)
+    while (ii < samples->size())
     {
-        i = double(transfer->buffer[ii+0]);
-        q = double(transfer->buffer[ii+1]);
-        ii += 2;
+        i = (*samples)[ii].real();
+        q = (*samples)[ii].imag();
+        ii += 1;
         
         double amp = 20.0 * log10( sqrt( pow(i,2) + pow(q,2) ) );
         
@@ -80,12 +81,12 @@ int main()
         return 1;
     }
     
-    hackrf.tune( fc_hz );
+    hackrf.set_center_freq( fc_hz );
     hackrf.set_sample_rate( fs_hz );
     hackrf.set_lna_gain( lna_gain );
     hackrf.set_amp_enable( amp_enable );
     hackrf.set_txvga_gain( txvga_gain );
-    hackrf.start_Rx( sample_block_cb_fn, (void*)(NULL) );
+    hackrf.start_Rx( device_sample_block_cb, (void*)(NULL) );
 
     //  Wait a while
     sleep(300);

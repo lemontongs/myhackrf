@@ -38,12 +38,13 @@ std::size_t waveform_index = 0;
 std::vector<uint8_t> waveform_i;
 std::vector<uint8_t> waveform_q;
 
-int sample_block_cb_fn(hackrf_transfer* transfer)
+
+int device_sample_block_cb(SampleChunk* samples, void* args)
 {
-    for (int ii = 0; ii < transfer->valid_length; ii+=2)
+    for (int ii = 0; ii < samples->size(); ii++)
     {
-        transfer->buffer[ii+0] = waveform_i[waveform_index];
-        transfer->buffer[ii+1] = waveform_q[waveform_index];
+        (*samples)[ii] = std::complex<double>(waveform_i[waveform_index], waveform_q[waveform_index]);
+        
         waveform_index++;
         if ( waveform_index > waveform_i.size() )
             waveform_index = 0;
@@ -120,12 +121,12 @@ int main()
         return 1;
     }
     
-    hackrf.tune( fc_hz );
+    hackrf.set_center_freq( fc_hz );
     hackrf.set_sample_rate( fs_hz );
     hackrf.set_lna_gain( lna_gain );
     hackrf.set_amp_enable( amp_enable );
     hackrf.set_txvga_gain( txvga_gain );
-    hackrf.start_Tx( sample_block_cb_fn, (void*)(NULL) );
+    hackrf.start_Tx( device_sample_block_cb, (void*)(NULL) );
 
     //  Wait a while
     sleep(3000000);

@@ -1,8 +1,8 @@
 #ifndef SDRRECEIVER_H
 #define SDRRECEIVER_H
 
-#include "zhelpers.h"
 #include "packet.pb.h"
+#include "zhelpers.hpp"
 
 #include <pthread.h>
 #include <stdint.h>

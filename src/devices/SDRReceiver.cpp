@@ -1,6 +1,7 @@
 
 #include "SDRReceiver.h"
 
+#include <unistd.h>
 #include <iostream>
 
 SDRReceiver::SDRReceiver()
@@ -38,6 +39,8 @@ void* thread_func(void* args)
     SDRReceiver* sdr_obj = (SDRReceiver*)args;
     
     sdr_obj->receivePackets();
+
+    return nullptr;
 }
 
 
@@ -91,7 +94,7 @@ void SDRReceiver::receivePackets()
     while (m_isRunning)
     {
         zmq::message_t msg;
-        if ( socket.recv(&msg) )
+        if ( socket.recv(msg, zmq::recv_flags::none) )
         {
             char* data_p = static_cast<char*>(msg.data());
             std::string data( data_p, msg.size() );

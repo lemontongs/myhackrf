@@ -129,7 +129,7 @@ int main()
         return 1;
     }
     
-    hackrf.tune( fc_hz );
+    hackrf.set_center_freq( fc_hz );
     hackrf.set_sample_rate( fs_hz );
     hackrf.set_lna_gain( lna_gain );
     hackrf.set_amp_enable( amp_enable );

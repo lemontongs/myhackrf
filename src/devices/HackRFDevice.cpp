@@ -100,9 +100,8 @@ int convert_to_device_rx_sample_block_cb_fn(hackrf_transfer *transfer)
 
     for (int ii = 0; ii < transfer->valid_length; ii+=2)
     {
-        sc.push_back( std::complex<double>( ( double( transfer->buffer[ii+0] + uint8_t(128) ) - double(128) ) / double(128),
-                                            ( double( transfer->buffer[ii+1] + uint8_t(128) ) - double(128) ) / double(128) ) );
-        
+        sc.push_back( std::complex<double>( ( double( int8_t( transfer->buffer[ii+0] ) ) / double(128) ),
+                                            ( double( int8_t( transfer->buffer[ii+1] ) ) / double(128) ) ) );
     }
     
     return (*callback_function)(&sc, callback_args);
@@ -148,7 +147,7 @@ int convert_to_device_tx_sample_block_cb_fn(hackrf_transfer *transfer)
     SampleChunk sc;
     device_callback_and_args->first(&sc, device_callback_and_args->second);
 
-    // Do something with transfer->buffer
+    // TODO: Do something with transfer->buffer
 
     return 0;
 }

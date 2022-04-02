@@ -2,6 +2,7 @@
 #include "packet.pb.h"
 #include "SDRReceiver.h"
 
+#include <unistd.h>
 #include <stdint.h>
 #include <algorithm>
 #include <ctime>
@@ -18,6 +19,7 @@ bool led_is_on = false;
 uint64_t fc = 0;
 double fs = 0.0;
 double thresh = 0.0;
+std::string host = "";
 uint32_t print_count = 0;
 
 //
@@ -34,24 +36,24 @@ double get_duration()
 //
 // LED ON
 //
-void blink_on( zmq::socket_t & socket )
+void blink_on( zmq::socket_t* socket )
 {
     if (!led_is_on)
     {
         led_is_on = true;
-        s_send( socket, std::string("blink on") );
+        s_send( *socket, std::string("blink on") );
     }
 }
 
 //
 // LED OFF
 //
-void blink_off( zmq::socket_t & socket )
+void blink_off( zmq::socket_t* socket )
 {
     if (led_is_on)
     {
         led_is_on = false;
-        s_send( socket, std::string("blink off") );
+        s_send( *socket, std::string("blink off") );
     }
 }
 
@@ -83,9 +85,9 @@ void process_data( Packet &p, zmq::socket_t* blink_interface, SDRReceiver* recei
 
     // Blink the LED (and print sone info) if we have detected a signal
     if ( signal_to_noise > 0.0 )
-        blink_on( *blink_interface );
+        blink_on( blink_interface );
     else
-        blink_off( *blink_interface );
+        blink_off( blink_interface );
 
     if ( signal_to_noise > 0.0 )
     {
@@ -124,9 +126,29 @@ void parse_args(int argc, char* argv[])
         if ( arg == "-h" || arg == "--help")
         {
             std::cout << "Usage: " << argv[0] << " -c <center frequency> -s <sample rate> -r <low frequency> <high frequency>" << std::endl;
+            std::cout << "    -i <host>                   hostname of the SDR server" << std::endl;
+            std::cout << "    -t <threshold>              amplitude threshold for detection reporting" << std::endl;
             std::cout << "    -c <center frequency hz>    center frequencie to tune to" << std::endl;
             std::cout << "    -s <sample rate hz>         device sample rate to use" << std::endl;
             std::cout << "    -r <low freq> <high freq>   low and high are frequency (Hz) ranges to monitor (can be many -r specifications" << std::endl << std::endl;
+        }
+        else if ( arg == "-i" )
+        {
+            if (aa + 1 >= argc)
+            {
+                std::cout << "Missing host!" << std::endl;
+                exit(1);
+            }
+            
+            // host argument
+            std::istringstream ss(argv[aa+1]);
+            if (!(ss >> host))
+            {
+                std::cout << "ERROR: Invalid host argument! '" << argv[aa+1] << "'" << std::endl;
+                exit(1);
+            }
+            
+            aa += 1;
         }
         else if ( arg == "-t" )
         {
@@ -275,12 +297,13 @@ int main(int argc, char* argv[])
     zmq::socket_t blink_interface(blink_context, ZMQ_PUB);
     blink_interface.connect("tcp://localhost:5558");
     
-    blink_on( blink_interface );
+    blink_on( &blink_interface );
     sleep(1);
-    blink_off( blink_interface );
+    blink_off( &blink_interface );
     
     // Setup the data receiver
     SDRReceiver rcv;
+    rcv.setIP(host);
     std::pair< zmq::socket_t*, SDRReceiver*> args = std::make_pair( &blink_interface, &rcv );
     rcv.initialize( receive_callback, (void*)&args );
     rcv.tune( fc );
