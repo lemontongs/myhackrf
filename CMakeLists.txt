@@ -6,7 +6,8 @@ set(CMAKE_INSTALL_PREFIX /tmp/myhackrf/)
 project(myHackRF)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "-Wno-psabi -Wno-deprecated-declarations -fsanitize=address -static-libasan")
+#set(CMAKE_CXX_FLAGS "-Wno-psabi -Wno-deprecated-declarations ")
+set(CMAKE_CXX_FLAGS "-Wall -Wno-psabi -Wno-deprecated-declarations -fsanitize=address -static-libasan")
 
 add_subdirectory(src/protobuffers)
 add_subdirectory(src/utilities)

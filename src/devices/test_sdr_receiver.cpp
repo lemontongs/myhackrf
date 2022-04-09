@@ -17,7 +17,7 @@ void signal_handler(int s)
 
 void callback( Packet &p, void* args )
 {
-    std::cout << "Got a packet! (" << p.signal_size() << ")" << std::endl;
+    std::cout << "Got a packet! (" << p.header().type() << ")" << std::endl;
 }
 
 //

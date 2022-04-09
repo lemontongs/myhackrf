@@ -1,24 +1,47 @@
 syntax="proto2";
 
-message Packet {
+message Packet_Header {
   
   enum PacketType {
-    RAW = 0;
+    IQ = 0;
     FFT = 1;
+    PDW = 2;
   }
   
   required PacketType type = 1;
-  
-  repeated double signal = 2;
-  repeated uint64 freq_bins_mhz = 3;
-  required uint32 fs = 4;
-  required uint32 fc = 5;
-  
-  optional int32 num_bins = 6;
-  optional int32 num_samples = 7;
-  optional double mean_db = 8;
-  optional double peak_db = 9;
-  optional double peak_bin_index = 10;
-  optional double low_db = 11;
+  required uint32 fs = 2;
+  required uint32 fc = 3;
+}
+
+message IQ_Packet {
+  repeated double signal = 1;
+}
+
+
+message FFT_Packet {
+  repeated uint64 freq_bins_hz = 1;
+  repeated double fft = 2;
+}
+
+message PDW {
+  required double toa_s = 1;
+  required double mean_amp_db = 2;
+  required double peak_amp_db = 3;
+  required double noise_amp_db = 4;
+  required double freq_offset_hz = 5;
+  repeated double signal = 6;
+}
+
+message PDW_Packet {
+  repeated PDW pdws = 1;
+}
+
+message Packet {
+  required Packet_Header header = 1;  
+  oneof body {
+    IQ_Packet iq_packet = 2;
+    FFT_Packet fft_packet = 3;
+    PDW_Packet pdw_packet = 4;
+  }
 }
 

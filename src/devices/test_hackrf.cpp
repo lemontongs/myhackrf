@@ -72,7 +72,16 @@ int main()
     HackRFDevice hackrf;
     
     bool rv = hackrf.initialize();
+    if ( ! rv )
+    {
+        std::cout << "Failed to initialize!" << std::endl;
+    }
+
     rv = hackrf.start_Rx( rx_cb_fn, NULL );
+    if ( ! rv )
+    {
+        std::cout << "Failed to start Rx!" << std::endl;
+    }
     
     sleep(1);
     

@@ -62,25 +62,29 @@ std::vector< std::pair<uint64_t,uint64_t> > monitor_ranges;
 //
 // fft
 //
-void process_data( Packet &p, zmq::socket_t* blink_interface, SDRReceiver* receiver )
+void process_data( const FFT_Packet &p, zmq::socket_t* blink_interface, SDRReceiver* receiver )
 {
     double peak = -9999.0;
+    double fft_sum = 0.0;
     //
     // Find the peak in the target frequency range
     //
-    for (int mm = 0; mm < monitor_ranges.size(); mm++)
+    for (std::size_t mm = 0; mm < monitor_ranges.size(); mm++)
     {
-        for (int ii = 0; ii < p.signal_size(); ii++)
+        for (int ii = 0; ii < p.fft_size(); ii++)
         {
-            if ( ( p.freq_bins_mhz(ii) > monitor_ranges[mm].first ) && \
-                 ( p.freq_bins_mhz(ii) < monitor_ranges[mm].second ) && \
-                 ( p.signal(ii) > peak ) )
-                    peak = p.signal(ii);
+            if ( ( p.freq_bins_hz(ii) > monitor_ranges[mm].first ) && \
+                 ( p.freq_bins_hz(ii) < monitor_ranges[mm].second ) && \
+                 ( p.fft(ii) > peak ) )
+                    peak = p.fft(ii);
+            
+            fft_sum += p.fft(ii);
         }
     }
 
     // threshold is some constant over the mean
-    double threshold = p.mean_db() + thresh;
+    double fft_mean_db = (fft_sum / p.fft_size());
+    double threshold = fft_mean_db + thresh;
     double signal_to_noise = peak - threshold;
 
     // Blink the LED (and print sone info) if we have detected a signal
@@ -94,18 +98,18 @@ void process_data( Packet &p, zmq::socket_t* blink_interface, SDRReceiver* recei
         if ( print_count == 0 )
             std::cout << " Time                     Mean  Thresh  Peak  SNR" << std::endl;
         std::cout << std::left << std::setw(8) << get_duration();
-        for (int mm = 0; mm < monitor_ranges.size(); mm++)
+        for (std::size_t mm = 0; mm < monitor_ranges.size(); mm++)
         {
             std::cout << "  ";
-            for (int ii = 0; ii < p.signal_size(); ii++)
+            for (int ii = 0; ii < p.fft_size(); ii++)
             {
-                if ( p.freq_bins_mhz(ii) > monitor_ranges[mm].first && p.freq_bins_mhz(ii) < monitor_ranges[mm].second )
+                if ( p.freq_bins_hz(ii) > monitor_ranges[mm].first && p.freq_bins_hz(ii) < monitor_ranges[mm].second )
                 {
-                    std::cout << "\e[48;5;" << std::max(232, std::min(int(232 + int(p.signal(ii)-threshold)),255)) << "m \e[0m";
+                    std::cout << "\e[48;5;" << std::max(232, std::min(int(232 + int(p.fft(ii)-threshold)),255)) << "m \e[0m";
                 }
             }
         }
-        std::cout << " " << std::left << std::setw(8) << std::setprecision(4) << p.mean_db()
+        std::cout << " " << std::left << std::setw(8) << std::setprecision(4) << fft_mean_db
                   << " " << std::left << std::setw(8) << std::setprecision(4) << threshold
                   << " " << std::left << std::setw(8) << std::setprecision(4) << peak
                   << " " << std::left << std::setw(8) << std::setprecision(4) << signal_to_noise
@@ -280,7 +284,14 @@ void receive_callback( Packet &p, void* args )
 {
     std::pair< zmq::socket_t*, SDRReceiver*>* p_args = (std::pair< zmq::socket_t*, SDRReceiver*>*)args;
     
-    process_data( p, p_args->first, p_args->second );
+    if ( p.has_fft_packet() )
+    {
+        process_data( p.fft_packet(), p_args->first, p_args->second );
+    }
+    else
+    {
+        std::cout << "WARNING! Packet has no FFT data." << std::endl;
+    }
 }
 
 //

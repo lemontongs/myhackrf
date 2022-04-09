@@ -16,13 +16,15 @@ typedef int (*device_sample_block_cb_fn)(SampleChunk* samples, void* args);
 class RFDevice
 {
 public:
+    virtual ~RFDevice() = default;
+    
     virtual bool initialize() = 0;
     virtual bool cleanup() = 0;
 
     virtual bool start_Rx( device_sample_block_cb_fn callback, void* args ) = 0;
-    bool stop_Rx();
+    virtual bool stop_Rx() = 0;
     virtual bool start_Tx( device_sample_block_cb_fn callback, void* args ) = 0;
-    bool stop_Tx();
+    virtual bool stop_Tx() = 0;
     
     virtual bool set_center_freq( double fc_hz ) = 0;
     virtual bool set_sample_rate( double fs_hz ) = 0;

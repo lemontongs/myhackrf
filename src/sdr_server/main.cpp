@@ -1,5 +1,6 @@
 
 #include "fft.h"
+#include "pulse_detector.h"
 #include "HackRFDevice.h"
 #include "packet.pb.h"
 #include "zhelpers.hpp"
@@ -15,7 +16,7 @@
 // Device driver
 RFDevice* rf_device;
 std::string sdr_type;
-Packet_PacketType rx_mode = Packet_PacketType_FFT;
+Packet_Header_PacketType rx_mode = Packet_Header_PacketType_PDW;
 
 bool g_shutdown_requested = false;
 
@@ -33,38 +34,57 @@ int sample_block_cb_fn(SampleChunk* samples, void* args)
 {
     // send the packet out over the network
     zmq::socket_t * publisher = (zmq::socket_t *)args;
+    static uint64_t sample_count = 0;
     
     Packet packet;
-    if (rx_mode == Packet_PacketType_FFT)
+    Packet_Header* header = packet.mutable_header();
+
+    header->set_type(rx_mode);
+    header->set_fc(uint32_t(rf_device->get_center_freq()));
+    header->set_fs(uint32_t(rf_device->get_sample_rate()));
+
+    switch (rx_mode)
     {
-        packet = \
-            utilities::fft( *samples,
+        case Packet_Header_PacketType_FFT:
+        {
+            FFT_Packet* fft_packet = packet.mutable_fft_packet();
+            utilities::fft( fft_packet,
+                            *samples,
                             2048,
                             rf_device->get_sample_rate(),
                             rf_device->get_center_freq() );
-        
-        packet.set_type(Packet_PacketType_FFT);
-    }
-    else
-    {
-        packet.set_type(Packet_PacketType_RAW);
-        packet.set_num_samples( samples->size() );
-        packet.set_num_bins( 0 );
-        packet.set_mean_db( 0.0 );
-        packet.set_peak_db( -9999.0 );
-        packet.set_low_db( 9999.0 );
-        packet.set_peak_bin_index( 0 );
-        packet.clear_signal();
-        for (int ii = 0; ii < samples->size(); ii++)
-        {
-            packet.add_signal((*samples).at(ii).real());
-            packet.add_signal((*samples).at(ii).imag());
+            
+            break;
         }
-    }
+        
+        case Packet_Header_PacketType_IQ:
+        {
+            IQ_Packet* iq_packet = packet.mutable_iq_packet();
+            for (std::size_t ii = 0; ii < samples->size(); ii++)
+            {
+                iq_packet->add_signal((*samples).at(ii).real());
+                iq_packet->add_signal((*samples).at(ii).imag());
+            }
+            break;
+        }
+        
+        case Packet_Header_PacketType_PDW:
+        {
+            PDW_Packet* pdw_packet = packet.mutable_pdw_packet();
+            utilities::detectPulses(pdw_packet, 
+                                    samples, 
+                                    sample_count, 
+                                    rf_device->get_sample_rate(),
+                                    5.0);
+            break;
+        }
 
-    packet.set_fc(rf_device->get_center_freq());
-    packet.set_fs(rf_device->get_sample_rate());
+        default:
+            return 0;
+    }
     
+    sample_count += samples->size();
+
     std::string data;
     packet.SerializeToString(&data);
     s_send( *publisher, data );
@@ -195,9 +215,11 @@ void process_messages( zmq::socket_t* comm_sock )
             }
             else
             {
-                rx_mode = Packet_PacketType_FFT;
+                rx_mode = Packet_Header_PacketType_FFT;
                 if (new_rx_mode == "iq")
-                    rx_mode = Packet_PacketType_RAW;
+                    rx_mode = Packet_Header_PacketType_IQ;
+                if (new_rx_mode == "pdw")
+                    rx_mode = Packet_Header_PacketType_PDW;
 
                 std::cout << "sdr_server: rx mode set to: " << new_rx_mode << "  " << rx_mode << std::endl;
                 s_send( *comm_sock, std::string("OK") );
@@ -284,7 +306,7 @@ int main(int argc, char* argv[])
     if ( rf_device->initialize() )
     {
         rf_device->set_sample_rate( 8000000 );
-        rf_device->set_center_freq( 433900000 );
+        rf_device->set_center_freq( 915000000 );
         rf_device->set_rx_gain( 40 );
         
         // Start receiving data
@@ -292,6 +314,8 @@ int main(int argc, char* argv[])
         
         // Listen for messages, this blocks until a "quit" is received
         process_messages( &receiver );
+
+        rf_device->stop_Rx();
     }
 
     rf_device->cleanup();

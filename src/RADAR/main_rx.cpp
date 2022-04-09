@@ -41,7 +41,7 @@ int device_sample_block_cb(SampleChunk* samples, void* args)
     std::cout << "P " << std::flush;
     
     double max_amp = -9999999.0;
-    int ii = 0;
+    std::size_t ii = 0;
     double i,q;
     
     while (ii < samples->size())

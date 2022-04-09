@@ -21,12 +21,12 @@ namespace utilities
     // f = f + fc;
     // f = f / 1e6;
     //
-    void calcFrequencyBins(Packet &packet, int N, double fs, uint64_t fc);
+    void calcFrequencyBins(FFT_Packet* packet, uint32_t N, double fs, uint64_t fc);
     
     //
     // fft
     //
-    Packet fft( SampleChunk &buffer, int num_fft_bins, double fs, uint64_t fc );
+    void fft( FFT_Packet* result, SampleChunk &buffer, uint32_t num_fft_bins, double fs, uint64_t fc );
 }
 
 #endif /* FFT_H */

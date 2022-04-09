@@ -3,6 +3,8 @@
 
 #include "HackRFDevice.h"
 
+bool g_pause_data_flow = false;
+
 HackRFDevice::HackRFDevice()
 {
     m_is_initialized = false;
@@ -37,8 +39,7 @@ bool HackRFDevice::initialize(const char* const desired_serial_number)
 {
     uint8_t board_id = BOARD_ID_INVALID;
     char version[255 + 1];
-    read_partid_serialno_t read_partid_serialno;
-
+    
     if ( ! check_error( hackrf_init() ) )
         return false;
 
@@ -91,6 +92,9 @@ bool HackRFDevice::initialize(const char* const desired_serial_number)
 
 int convert_to_device_rx_sample_block_cb_fn(hackrf_transfer *transfer)
 {
+    if ( g_pause_data_flow )
+        return 0;
+    
     std::pair<device_sample_block_cb_fn*, void**>* callback_args_pair = (std::pair<device_sample_block_cb_fn*, void**>*)(transfer->rx_ctx);
     device_sample_block_cb_fn* callback_function = callback_args_pair->first;
     void* callback_args = *(callback_args_pair->second);
@@ -142,6 +146,9 @@ bool HackRFDevice::stop_Rx()
 
 int convert_to_device_tx_sample_block_cb_fn(hackrf_transfer *transfer)
 {
+    if ( g_pause_data_flow )
+        return 0;
+    
     auto device_callback_and_args = (std::pair<device_sample_block_cb_fn, void*>*)transfer->tx_ctx;
     
     SampleChunk sc;
@@ -189,12 +196,16 @@ bool HackRFDevice::set_center_freq( double fc_hz )
     {
         if ( fc_hz >= 20000000 && fc_hz <= 6000000000 )
         {
+            g_pause_data_flow = true;
             std::cout << "HackRFDevice: Tuning to " << fc_hz << std::endl;
             if ( check_error( hackrf_set_freq( m_device, fc_hz ) ) )
             {
+                std::cout << "HackRFDevice: Done" << std::endl;
                 m_fc_hz = fc_hz;
+                g_pause_data_flow = false;
                 return true;
             }
+            g_pause_data_flow = false;
         }
         else
         {
@@ -215,10 +226,12 @@ bool HackRFDevice::set_sample_rate( double fs_hz )
         case 12500000 :
         case 10000000 :
         case  8000000 :
+            g_pause_data_flow = true;
             return force_sample_rate( fs_hz );
         default:
             std::cout << "HackRFDevice: WARNING: invalid sample rate: " << fs_hz << std::endl;
         }
+        g_pause_data_flow = false;
     }
     return false;
 }

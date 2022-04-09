@@ -41,7 +41,7 @@ std::vector<uint8_t> waveform_q;
 
 int device_sample_block_cb(SampleChunk* samples, void* args)
 {
-    for (int ii = 0; ii < samples->size(); ii++)
+    for (std::size_t ii = 0; ii < samples->size(); ii++)
     {
         (*samples)[ii] = std::complex<double>(waveform_i[waveform_index], waveform_q[waveform_index]);
         
@@ -65,10 +65,9 @@ double slopeFactor = (chirp_width - df)/(2.0*pw);
 
 void createWaveform()
 {
-    
+
 #define SAVE_FILE
 #ifdef SAVE_FILE
-int write_file = 1;
 std::ofstream ofile("tx.csv", std::ofstream::out);
 #endif
 
