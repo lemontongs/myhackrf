@@ -94,10 +94,18 @@ int convert_to_device_rx_sample_block_cb_fn(hackrf_transfer *transfer)
 {
     if ( g_pause_data_flow )
         return 0;
-    
-    std::pair<device_sample_block_cb_fn*, void**>* callback_args_pair = (std::pair<device_sample_block_cb_fn*, void**>*)(transfer->rx_ctx);
-    device_sample_block_cb_fn* callback_function = callback_args_pair->first;
-    void* callback_args = *(callback_args_pair->second);
+
+    // printf("call\n");
+    // printf("p %p\n", (void*)(transfer->rx_ctx));
+
+    std::pair<device_sample_block_cb_fn, void*>* callback_args_pair = (std::pair<device_sample_block_cb_fn, void*>*)(transfer->rx_ctx);
+
+    // printf("p %p\n", (void*)callback_args_pair);
+    // printf("c %p\n", callback_args_pair->first);
+    // printf("a %p\n", callback_args_pair->second);
+
+    device_sample_block_cb_fn callback_function = callback_args_pair->first;
+    void* callback_args = callback_args_pair->second;
 
     SampleChunk sc;
     sc.reserve(transfer->valid_length/2);
@@ -108,7 +116,7 @@ int convert_to_device_rx_sample_block_cb_fn(hackrf_transfer *transfer)
                                             ( double( int8_t( transfer->buffer[ii+1] ) ) / double(128) ) ) );
     }
     
-    return (*callback_function)(&sc, callback_args);
+    return callback_function(&sc, callback_args);
 }
 
 bool HackRFDevice::start_Rx( device_sample_block_cb_fn callback, void* args = NULL )
@@ -117,9 +125,13 @@ bool HackRFDevice::start_Rx( device_sample_block_cb_fn callback, void* args = NU
     {
         std::cout << "HackRFDevice: Starting Rx" << std::endl;
 
-        std::pair<device_sample_block_cb_fn*, void**> callback_args = std::make_pair(&callback, &args);
+        std::pair<device_sample_block_cb_fn, void*>* callback_args = new std::pair<device_sample_block_cb_fn, void*>(callback, args);
+
+        // printf("p %p\n", (void*)callback_args);
+        // printf("c %p\n", callback);
+        // printf("a %p\n", args);
     
-        if ( check_error( hackrf_start_rx( m_device, convert_to_device_rx_sample_block_cb_fn, (void*)(&callback_args) ) ) )
+        if ( check_error( hackrf_start_rx( m_device, convert_to_device_rx_sample_block_cb_fn, (void*)callback_args ) ) )
         {
             m_device_mode = RX_MODE;
             return true;
@@ -149,12 +161,23 @@ int convert_to_device_tx_sample_block_cb_fn(hackrf_transfer *transfer)
     if ( g_pause_data_flow )
         return 0;
     
-    auto device_callback_and_args = (std::pair<device_sample_block_cb_fn, void*>*)transfer->tx_ctx;
-    
-    SampleChunk sc;
-    device_callback_and_args->first(&sc, device_callback_and_args->second);
+    auto callback_args_pair = (std::pair<device_sample_block_cb_fn, void*>*)(transfer->tx_ctx);
+    device_sample_block_cb_fn callback_function = callback_args_pair->first;
+    void* callback_args = callback_args_pair->second;
 
+    // Get samples from the user by calling the provided callback function
+    SampleChunk sc(std::size_t(transfer->buffer_length/2));
+    callback_function(&sc, callback_args);
+    std::cout << "Got " << sc.size() << " samples for Tx" << std::endl;
+    
     // TODO: Do something with transfer->buffer
+    for (std::size_t ii = 0; ii < sc.size(); ii++)
+    {
+        int8_t i = int8_t(sc[ii].real() * 128);
+        int8_t q = int8_t(sc[ii].imag() * 128);
+        transfer->buffer[(ii*2)+0] = i;
+        transfer->buffer[(ii*2)+1] = q;
+    }
 
     return 0;
 }
@@ -164,8 +187,10 @@ bool HackRFDevice::start_Tx( device_sample_block_cb_fn callback, void* args = NU
     if ( m_is_initialized && m_device_mode == STANDBY_MODE )
     {
         std::cout << "HackRFDevice: Starting Tx" << std::endl;
-        auto callback_args = std::make_pair(callback, args);
-        if ( check_error( hackrf_start_tx( m_device, convert_to_device_tx_sample_block_cb_fn, (void*)&callback_args ) ) )
+        
+        std::pair<device_sample_block_cb_fn, void*>* callback_args = new std::pair<device_sample_block_cb_fn, void*>(callback, args);
+        
+        if ( check_error( hackrf_start_tx( m_device, convert_to_device_tx_sample_block_cb_fn, (void*)callback_args ) ) )
         {
             m_device_mode = TX_MODE;
             return true;
@@ -226,8 +251,12 @@ bool HackRFDevice::set_sample_rate( double fs_hz )
         case 12500000 :
         case 10000000 :
         case  8000000 :
+        {
             g_pause_data_flow = true;
-            return force_sample_rate( fs_hz );
+            bool rv = force_sample_rate( fs_hz );
+            g_pause_data_flow = false;
+            return rv;
+        }
         default:
             std::cout << "HackRFDevice: WARNING: invalid sample rate: " << fs_hz << std::endl;
         }
@@ -332,7 +361,7 @@ bool HackRFDevice::set_amp_enable( uint8_t amp_enable )
 {
     if ( m_is_initialized )
     {
-        std::cout << "HackRFDevice: Setting AMP enable: " << amp_enable << std::endl;
+        std::cout << "HackRFDevice: Setting AMP enable: " << int(amp_enable) << std::endl;
         if ( check_error( hackrf_set_amp_enable( m_device, amp_enable ) ) )
         {
             m_amp_enable = amp_enable;

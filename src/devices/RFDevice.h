@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <complex>
+#include <functional>
 
 #define STANDBY_MODE 0
 #define RX_MODE      1
@@ -11,7 +12,8 @@
 
 typedef std::vector<std::complex<double>> SampleChunk;
 
-typedef int (*device_sample_block_cb_fn)(SampleChunk* samples, void* args);
+//typedef int (device_sample_block_cb_fn)(SampleChunk* samples, void* args);
+typedef std::function<int(SampleChunk* samples, void* args)> device_sample_block_cb_fn;
 
 class RFDevice
 {

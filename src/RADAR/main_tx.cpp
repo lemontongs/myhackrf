@@ -41,6 +41,8 @@ std::vector<uint8_t> waveform_q;
 
 int device_sample_block_cb(SampleChunk* samples, void* args)
 {
+    //std::cout << "In Radar Tx" << std::endl;
+    
     for (std::size_t ii = 0; ii < samples->size(); ii++)
     {
         (*samples)[ii] = std::complex<double>(waveform_i[waveform_index], waveform_q[waveform_index]);
@@ -57,8 +59,8 @@ int device_sample_block_cb(SampleChunk* samples, void* args)
 
 double dt = 1.0/fs_hz;
 double df = 1.5e6; // 1MHz baseband CW
-double pri = 1e-3;
 double pw = 1e-3;
+double pri = 5e-3;
 double amp = 100;
 double chirp_width = df + 200e3;
 double slopeFactor = (chirp_width - df)/(2.0*pw);
@@ -69,6 +71,7 @@ void createWaveform()
 #define SAVE_FILE
 #ifdef SAVE_FILE
 std::ofstream ofile("tx.csv", std::ofstream::out);
+ofile << "t,i,q" << std::endl;
 #endif
 
     double t = 0.0;
@@ -85,11 +88,17 @@ std::ofstream ofile("tx.csv", std::ofstream::out);
         
 #ifdef SAVE_FILE
         ofile << t << ","
-//                  << unsigned(transfer->buffer[ii+1]) << ","
-//                  << unsigned(transfer->buffer[ii+1]) << std::endl;
         << i << ","
         << q << std::endl;
 #endif
+
+        t = t+dt;
+    }
+
+    while (t < pri)
+    {
+        waveform_i.push_back(0);
+        waveform_q.push_back(0);
 
         t = t+dt;
     }
@@ -114,7 +123,7 @@ int main()
     
     createWaveform();
     
-    if ( ! hackrf.initialize( "23ec7" ) )
+    if ( ! hackrf.initialize() )
     {
         std::cout << "Error initializing hackrf device!" << std::endl;
         return 1;
