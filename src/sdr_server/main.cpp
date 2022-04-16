@@ -38,6 +38,7 @@ int sample_block_cb_fn(SampleChunk* samples, void* args)
     
     Packet packet;
     Packet_Header* header = packet.mutable_header();
+    bool send = true;
 
     header->set_type(rx_mode);
     header->set_fc(uint32_t(rf_device->get_center_freq()));
@@ -76,6 +77,10 @@ int sample_block_cb_fn(SampleChunk* samples, void* args)
                                     sample_count, 
                                     rf_device->get_sample_rate(),
                                     5.0);
+            
+            // If no PDWs then don't send
+            if (pdw_packet->pdws_size() < 1)
+                send = false;
             break;
         }
 
@@ -85,10 +90,14 @@ int sample_block_cb_fn(SampleChunk* samples, void* args)
     
     sample_count += samples->size();
 
-    std::string data;
-    packet.SerializeToString(&data);
-    s_send( *publisher, data );
-    
+    if (send)
+    {
+        //std::cout << "Sending: " << header->type() << std::endl;
+        std::string data;
+        packet.SerializeToString(&data);
+        s_send( *publisher, data );
+    }
+
     return 0;
 }
 
@@ -215,12 +224,19 @@ void process_messages( zmq::socket_t* comm_sock )
             }
             else
             {
-                rx_mode = Packet_Header_PacketType_FFT;
-                if (new_rx_mode == "iq")
+                if (new_rx_mode.compare("iq") == 0)
                     rx_mode = Packet_Header_PacketType_IQ;
-                if (new_rx_mode == "pdw")
+                else if (new_rx_mode.compare("pdw") == 0)
                     rx_mode = Packet_Header_PacketType_PDW;
-
+                else if (new_rx_mode.compare("fft") == 0)
+                    rx_mode = Packet_Header_PacketType_FFT;
+                else
+                {
+                    std::cout << "sdr_server: invalid rx mode! '" << new_rx_mode << "'  current mode: " << rx_mode << std::endl;
+                    s_send( *comm_sock, std::string("ERROR: invalid rx mode argument") );
+                    continue;
+                }
+                
                 std::cout << "sdr_server: rx mode set to: " << new_rx_mode << "  " << rx_mode << std::endl;
                 s_send( *comm_sock, std::string("OK") );
             }
@@ -306,8 +322,6 @@ int main(int argc, char* argv[])
     if ( rf_device->initialize() )
     {
         rf_device->set_sample_rate( 8000000 );
-        rf_device->set_center_freq( 915000000 );
-        rf_device->set_rx_gain( 40 );
         
         // Start receiving data
         rf_device->start_Rx( sample_block_cb_fn, (void*)(&publisher) );

@@ -24,6 +24,7 @@ uint32_t txvga_gain = 10;
 void signal_handler(int s)
 {
     printf("Caught signal %d\n",s);
+    hackrf.stop_Tx();
     hackrf.cleanup();
     exit(0);
 }

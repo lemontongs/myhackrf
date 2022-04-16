@@ -170,9 +170,9 @@ namespace utilities
                 {
                     state = NOISE;
                     pw = ii - toa;
-                    std::cout << "PULSE: " << toa << "  " << pw << std::endl;
+                    //std::cout << "PULSE: " << toa << "  " << pw << std::endl;
                     PDW* new_pdw = result->add_pdws();
-                    new_pdw->set_toa_s( (base_sample_count + toa) / fs );
+                    new_pdw->set_toa_s( double(base_sample_count + toa) / fs );
 
                     //new_pdw->set_freq_offset_hz();
                     
@@ -244,8 +244,8 @@ namespace utilities
             log = false;
         }
         
-        
-        std::cout << "PULSES: " << result->pdws_size() << "  MEAN: " << mean_iq_db << "  PEAK: " << max_iq_db << std::endl;
+        // if (result->pdws_size() > 0)
+        //     std::cout << "PULSES: " << result->pdws_size() << "  MEAN: " << mean_iq_db << "  PEAK: " << max_iq_db << std::endl;
     }
 }
 

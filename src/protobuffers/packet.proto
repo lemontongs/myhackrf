@@ -14,7 +14,7 @@ message Packet_Header {
 }
 
 message IQ_Packet {
-  repeated double signal = 1;
+  repeated float signal = 1;
 }
 
 
@@ -29,7 +29,7 @@ message PDW {
   required double peak_amp_db = 3;
   required double noise_amp_db = 4;
   required double freq_offset_hz = 5;
-  repeated double signal = 6;
+  repeated float signal = 6;
 }
 
 message PDW_Packet {
