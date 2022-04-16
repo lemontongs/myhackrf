@@ -153,7 +153,7 @@ int convert_to_device_tx_sample_block_cb_fn(hackrf_transfer *transfer)
 {
     if ( g_pause_data_flow )
         return 0;
-    
+
     auto callback_args_pair = (std::pair<device_sample_block_cb_fn, void*>*)(transfer->tx_ctx);
     device_sample_block_cb_fn callback_function = callback_args_pair->first;
     void* callback_args = callback_args_pair->second;
@@ -161,15 +161,14 @@ int convert_to_device_tx_sample_block_cb_fn(hackrf_transfer *transfer)
     // Get samples from the user by calling the provided callback function
     SampleChunk sc(std::size_t(transfer->buffer_length/2));
     callback_function(&sc, callback_args);
-    std::cout << "Got " << sc.size() << " samples for Tx" << std::endl;
-    
-    // TODO: Do something with transfer->buffer
+    //std::cout << "Got " << sc.size() << " samples for Tx" << std::endl;
+
     for (std::size_t ii = 0; ii < sc.size(); ii++)
     {
-        int8_t i = int8_t(sc[ii].real() * 128);
-        int8_t q = int8_t(sc[ii].imag() * 128);
-        transfer->buffer[(ii*2)+0] = i;
-        transfer->buffer[(ii*2)+1] = q;
+        int8_t i = int8_t(sc[ii].real() * 127);
+        int8_t q = int8_t(sc[ii].imag() * 127);
+        transfer->buffer[(ii*2)+0] = uint8_t(i);
+        transfer->buffer[(ii*2)+1] = uint8_t(q);
     }
 
     return 0;
@@ -180,9 +179,9 @@ bool HackRFDevice::start_Tx( device_sample_block_cb_fn callback, void* args = NU
     if ( m_is_initialized && m_device_mode == STANDBY_MODE )
     {
         std::cout << "HackRFDevice: Starting Tx" << std::endl;
-        
+
         std::pair<device_sample_block_cb_fn, void*>* callback_args = new std::pair<device_sample_block_cb_fn, void*>(callback, args);
-        
+
         if ( check_error( hackrf_start_tx( m_device, convert_to_device_tx_sample_block_cb_fn, (void*)callback_args ) ) )
         {
             m_device_mode = TX_MODE;
@@ -248,6 +247,7 @@ bool HackRFDevice::set_sample_rate( double fs_hz )
         case 10000000 :
         case  8000000 :
         case  2000000 :
+        case  1000000 :
         {
             return force_sample_rate( fs_hz );
         }
@@ -266,7 +266,7 @@ bool HackRFDevice::force_sample_rate( double fs_hz )
         uint32_t baseband_filter_bw_hz = hackrf_compute_baseband_filter_bw_round_down_lt( uint32_t(fs_hz) );
         std::cout << "HackRFDevice: Setting filter to " << baseband_filter_bw_hz << std::endl;
         hackrf_set_baseband_filter_bandwidth( m_device, baseband_filter_bw_hz );
-        
+
         std::cout << "HackRFDevice: Setting sample rate to " << fs_hz << std::endl;
         if ( check_error( hackrf_set_sample_rate( m_device, fs_hz ) ) )
         {
@@ -409,10 +409,10 @@ bool HackRFDevice::cleanup()
     if ( m_is_initialized )
     {
         m_is_initialized = false;
-        
+
         stop_Rx();
         stop_Tx();
-        
+
         if ( ! check_error( hackrf_close( m_device ) ) )
             std::cout << "HackRFDevice: Error: failed to release device!" << std::endl;
 
