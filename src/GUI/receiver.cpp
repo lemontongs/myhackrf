@@ -40,6 +40,10 @@ bool Receiver::initialize()
         }
 
         isInitialized = true;
+		
+		s_send(*comm_socket, std::string("set-rx-mode fft"));
+		s_recv(*comm_socket);
+		
         updateParameters();
         return true;
     }
@@ -58,7 +62,7 @@ void Receiver::stop()
 
 void Receiver::updateParameters()
 {
-    qDebug() << "Requesting Fc...";
+    qDebug() << "Requesting Fc from: " << comm_target;
     s_send(*comm_socket, std::string("get-fc"));
     std::stringstream ss1(s_recv(*comm_socket));
     ss1 >> fc_hz;
@@ -70,7 +74,7 @@ void Receiver::updateParameters()
     ss2 >> fs_hz;
     qDebug() << "Got: " << fs_hz;
 
-    emit newParameters(double(fc_hz), fs_hz, data_target);
+    emit newParameters(fc_hz, fs_hz, data_target);
     qDebug() << "Emitting new parameters";
 }
 
@@ -104,7 +108,7 @@ void Receiver::receivePackets()
 }
 
 
-void Receiver::tune(u_int64_t fc_hz)
+void Receiver::tune(uint64_t fc_hz)
 {
     QString command = QString("set-fc ") + QString::number(fc_hz);
     s_send(*comm_socket, command.toStdString());
@@ -113,7 +117,7 @@ void Receiver::tune(u_int64_t fc_hz)
     updateParameters();
 }
 
-void Receiver::setSampleRate(double fs_hz)
+void Receiver::setSampleRate(uint64_t fs_hz)
 {
     QString command = QString("set-fs ") + QString::number(fs_hz);
     s_send(*comm_socket, command.toStdString());
