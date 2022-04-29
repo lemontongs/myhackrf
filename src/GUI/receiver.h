@@ -4,7 +4,7 @@
 #include <QObject>
 
 #include "packet.pb.h"
-#include "zhelpers.h"
+#include "zhelpers.hpp"
 
 class Receiver : public QObject
 {
@@ -14,8 +14,8 @@ public:
     Receiver();
     bool initialize();
     void setIP(QString ipAddress);
-    void tune(u_int64_t fc_hz);
-    void setSampleRate(double fs_hz);
+    void tune(uint64_t fc_hz);
+    void setSampleRate(uint64_t fs_hz);
 
 public slots:
     void receivePackets();
@@ -23,7 +23,7 @@ public slots:
 
 signals:
     void newPacket(Packet pkt);
-    void newParameters(double fc_hz, double fs_hz, QString data_target);
+    void newParameters(uint64_t fc_hz, uint64_t fs_hz, QString data_target);
 
 private:
     void updateParameters();
@@ -38,9 +38,9 @@ private:
     zmq::context_t * comm_context;
     zmq::socket_t * comm_socket;
 
-    u_int64_t fc_hz;    // center freq
-    double    fs_hz;    // sample rate
-    u_int32_t lna_gain; // gain
+    uint64_t  fc_hz;    // center freq
+    uint64_t  fs_hz;    // sample rate
+    uint32_t  lna_gain; // gain
 };
 
 #endif // RECEIVER_H

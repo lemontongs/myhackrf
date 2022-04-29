@@ -6,6 +6,8 @@
 #include <QThread>
 #include <qwt_plot_curve.h>
 #include <qwt_plot.h>
+#include <qwt_plot_spectrogram.h>
+#include <qwt_color_map.h>
 
 #include "packet.pb.h"
 #include "receiver.h"
@@ -13,6 +15,8 @@
 namespace Ui {
 class MainWindow;
 }
+
+class SpectrogramData;
 
 class MainWindow : public QMainWindow
 {
@@ -24,7 +28,7 @@ public:
 
 public slots:
     void handleNewPacket(Packet p);
-    void handleNewParameters(double fc_hz, double fs_hz, QString host);
+    void handleNewParameters(uint64_t fc_hz, uint64_t fs_hz, QString host);
 
 signals:
     void startReceivingPackets(void);
@@ -43,8 +47,12 @@ private:
     Receiver m_receiver;
     QThread m_receiveThread;
 
+    QwtPlot * p1;
     QwtPlotCurve d_curve;
-    QwtPlot * p;
+
+    QwtPlot * p2;
+    QwtPlotSpectrogram *d_spectrogram;
+    SpectrogramData* m_specData;
 
     QVector<QPointF> data;
     int num_fft_bins;
