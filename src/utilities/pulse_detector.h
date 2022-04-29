@@ -4,6 +4,8 @@
 
 #include "packet.pb.h"
 
+#include "fft.h"
+
 #include <stdint.h>
 #include <vector>
 #include <deque>
@@ -89,7 +91,11 @@ namespace utilities
     //
     // Find pulses in IQ data
     //
-    void detectPulses(PDW_Packet* result, SampleChunk* samples, uint64_t base_sample_count, double fs, double threshold_over_mean_db)
+    void detectPulses(PDW_Packet* result, 
+                      SampleChunk* samples, 
+                      uint64_t base_sample_count, 
+                      double fs, 
+                      double threshold_over_mean_db)
     {
         static bool log = true;
         LogItemList log_data;
@@ -122,15 +128,16 @@ namespace utilities
         // Rising edge = M of N samples over threshold
         // Falling edge = M of N samples below threshold
         double pulse_declaration_threshold = (mean_iq_db + threshold_over_mean_db);
-        const uint32_t M = 5;
-        const uint32_t N = 8;
+        const double M_s = 0.000012;
+        const double N_s = 0.000015;
+        const uint32_t M = uint32_t(M_s * fs);
+        const uint32_t N = uint32_t(N_s * fs);
 
         // Loop sample power
         uint32_t det_count = 0;
         DetectionState state = NOISE;
         uint32_t toa = 0;
         uint32_t pw = 0;
-        std::vector<std::complex<double>> pulse_iq;
         MovingAverage noise_average(sample_power.size());
         log_data.reserve(sample_power.size());
         
@@ -155,7 +162,7 @@ namespace utilities
                 if ( det_count > M )
                 {
                     state = DETECTION;
-                    toa = ii;
+                    toa = ii - det_count;
                 }
                 else
                 {
@@ -166,36 +173,63 @@ namespace utilities
             if ( state == DETECTION )
             {
                 // Falling edge
-                if ( (N - det_count) > M )
+                if ( det_count < M )
                 {
                     state = NOISE;
-                    pw = ii - toa;
-                    //std::cout << "PULSE: " << toa << "  " << pw << std::endl;
+                    
+                    // Find the real pulse edges, rather than the M of N boundaries
+                    for (std::size_t jj = toa; jj < ii; jj++)
+                    {
+                        if ( sample_power[jj] > pulse_declaration_threshold )
+                        {
+                            toa = jj;
+                            break;
+                        }
+                    }
+                    for (std::size_t jj = (ii-(2*M)); jj < ii; jj++)
+                    {
+                        if ( sample_power[jj] < pulse_declaration_threshold )
+                        {
+                            pw = jj - toa;
+                            break;
+                        }
+                    }
+
                     PDW* new_pdw = result->add_pdws();
                     new_pdw->set_toa_s( double(base_sample_count + toa) / fs );
+                    new_pdw->set_pw_s( double(pw) / fs );
 
-                    //new_pdw->set_freq_offset_hz();
-                    
-                    MovingAverage pulse_average(pw);
+                    // Compute center frequency
+                    FFT_Packet result;
+                    SampleChunk buffer;
+                    for (std::size_t jj = 0; jj < pw; jj++)
+                        buffer.push_back((*samples).at(toa + jj));
 
-                    for (std::size_t jj = 0; jj < pulse_iq.size(); jj++)
+                    fft( &result, buffer, 512, fs, 0.0 );
+                    double max_val = -9999999.0;
+                    std::size_t max_ind = 0;
+                    for (int jj = 0; jj < result.fft_size(); jj++)
                     {
-                        new_pdw->add_signal(pulse_iq[jj].real());
-                        new_pdw->add_signal(pulse_iq[jj].imag());
+                        if ( result.fft(jj) > max_val )
+                        {
+                            max_val = result.fft(jj);
+                            max_ind = jj;
+                        }
+                    }
+                    new_pdw->set_freq_offset_hz( result.freq_bins_hz(max_ind) );
 
-                        pulse_average.addItem(sample_power[toa+jj]);
+                    // Measure average power
+                    MovingAverage pulse_average(pw);
+                    for (std::size_t jj = 0; jj < pw; jj++)
+                    {
+                        new_pdw->add_signal((*samples).at(toa + jj).real());
+                        new_pdw->add_signal((*samples).at(toa + jj).imag());
+                        pulse_average.addItem(sample_power[toa + jj]);
                     }
 
                     new_pdw->set_mean_amp_db(pulse_average.getAverage());
                     new_pdw->set_peak_amp_db(pulse_average.getMax());
                     new_pdw->set_noise_amp_db(noise_average.getAverage());
-
-                    pulse_iq.clear();
-                }
-                else
-                {
-                    // Save the samples
-                    pulse_iq.push_back( (*samples).at(ii) );
                 }
             }
             LogItem it;

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js" type="text/javascript"></script>
+        <script src="https://cdn.jsdelivr.net/npm/mathjs@10.1.0/lib/browser/math.min.js" type="text/javascript"></script>
+        <script src="https://cdn.jsdelivr.net/npm/google-protobuf@3.20.1/google-protobuf.js" type="text/javascript"></script>
+        <style>
+
+            .control-container-1 {
+                height: 50px;
+                flex: 0 0 auto;
+                align-items: center;
+            }
+
+            .chart-container {
+                height: 300px;
+                flex: 0 0 auto;
+            }
+
+            .main-container {
+                display: flex;
+                flex-wrap: wrap;
+                flex-direction: column;
+                justify-content: center;
+            }
+
+            .main-container > div {
+                padding: 0px 10px;
+            }
+          </style>
+    </head>
+    <body>
+        <div class="main-container">
+            <div class="control-container-1" align="center">
+                <button onclick="connection.send('start'); connection.send('more')">Start</button>
+                <button onclick="pause()">Pause</button>
+                <button onclick="connection.send('stop')">Stop</button>
+            </div>
+            <div class="chart-container">
+                <canvas id="iq-chart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="mag-chart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="fft-chart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="waterfall-chart"></canvas>
+            </div>
+        </div>
+    </body>
+    <script src="js/fft.js"></script>
+    <script src="js/iq_chart.js"></script>
+    <script src="js/packet.js"></script>
+</html>

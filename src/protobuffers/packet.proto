@@ -19,17 +19,18 @@ message IQ_Packet {
 
 
 message FFT_Packet {
-  repeated uint64 freq_bins_hz = 1;
+  repeated double freq_bins_hz = 1;
   repeated double fft = 2;
 }
 
 message PDW {
   required double toa_s = 1;
-  required double mean_amp_db = 2;
-  required double peak_amp_db = 3;
-  required double noise_amp_db = 4;
-  required double freq_offset_hz = 5;
-  repeated float signal = 6;
+  required double pw_s = 2;
+  required double mean_amp_db = 3;
+  required double peak_amp_db = 4;
+  required double noise_amp_db = 5;
+  required double freq_offset_hz = 6;
+  repeated float signal = 7;
 }
 
 message PDW_Packet {
