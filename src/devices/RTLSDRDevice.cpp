@@ -98,7 +98,7 @@ bool RTLSDRDevice::stop_Rx()
             return false;
         }
         pthread_join( m_thread_context, NULL );
-        m_device_mode == STANDBY_MODE;
+        m_device_mode = STANDBY_MODE;
         return true;
     }
     return false;
@@ -157,10 +157,9 @@ bool RTLSDRDevice::set_lna_gain( uint32_t lna_gain )
         
         rtlsdr_get_tuner_gains( m_device, gains );
         
-        bool found = false;
         for (int gg = 0; gg < num_gains; gg++)
         {
-            if ( gains[gg] == lna_gain )
+            if ( gains[gg] == int(lna_gain) )
             {
                 std::cout << "Setting LNA gain..." << std::endl;
                 rtlsdr_set_tuner_gain( m_device, lna_gain );

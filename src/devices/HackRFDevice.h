@@ -52,6 +52,7 @@ private:
     uint8_t        m_antenna_enable;
     uint32_t       m_rxvga_gain;
     uint32_t       m_txvga_gain;
+    std::pair<device_sample_block_cb_fn, void*>* m_callback_args;
     
     // PRIVATE FUNCTIONS
     bool check_error(int error);

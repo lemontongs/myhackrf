@@ -119,9 +119,9 @@ bool HackRFDevice::start_Rx( device_sample_block_cb_fn callback, void* args = NU
     {
         std::cout << "HackRFDevice: Starting Rx" << std::endl;
 
-        std::pair<device_sample_block_cb_fn, void*>* callback_args = new std::pair<device_sample_block_cb_fn, void*>(callback, args);
+        m_callback_args = new std::pair<device_sample_block_cb_fn, void*>(callback, args);
 
-        if ( check_error( hackrf_start_rx( m_device, convert_to_device_rx_sample_block_cb_fn, (void*)callback_args ) ) )
+        if ( check_error( hackrf_start_rx( m_device, convert_to_device_rx_sample_block_cb_fn, (void*)m_callback_args ) ) )
         {
             m_device_mode = RX_MODE;
             return true;
@@ -139,9 +139,11 @@ bool HackRFDevice::stop_Rx()
         if ( ! check_error( hackrf_stop_rx( m_device ) ) )
         {
             std::cout << "HackRFDevice: Error: failed to stop rx mode!" << std::endl;
+            delete m_callback_args;
             g_pause_data_flow = false;
             return false;
         }
+        delete m_callback_args;
         m_device_mode = STANDBY_MODE;
         g_pause_data_flow = false;
         return true;
@@ -159,9 +161,11 @@ int convert_to_device_tx_sample_block_cb_fn(hackrf_transfer *transfer)
     void* callback_args = callback_args_pair->second;
 
     // Get samples from the user by calling the provided callback function
-    SampleChunk sc(std::size_t(transfer->buffer_length/2));
+    SampleChunk sc(std::size_t(transfer->valid_length/2), std::complex<double>(0,0));
     callback_function(&sc, callback_args);
     //std::cout << "Got " << sc.size() << " samples for Tx" << std::endl;
+
+    transfer->valid_length = sc.size() * 2;
 
     for (std::size_t ii = 0; ii < sc.size(); ii++)
     {
@@ -180,9 +184,9 @@ bool HackRFDevice::start_Tx( device_sample_block_cb_fn callback, void* args = NU
     {
         std::cout << "HackRFDevice: Starting Tx" << std::endl;
 
-        std::pair<device_sample_block_cb_fn, void*>* callback_args = new std::pair<device_sample_block_cb_fn, void*>(callback, args);
+        m_callback_args = new std::pair<device_sample_block_cb_fn, void*>(callback, args);
 
-        if ( check_error( hackrf_start_tx( m_device, convert_to_device_tx_sample_block_cb_fn, (void*)callback_args ) ) )
+        if ( check_error( hackrf_start_tx( m_device, convert_to_device_tx_sample_block_cb_fn, (void*)m_callback_args ) ) )
         {
             m_device_mode = TX_MODE;
             return true;
@@ -200,9 +204,11 @@ bool HackRFDevice::stop_Tx()
         if ( ! check_error( hackrf_stop_tx( m_device ) ) )
         {
             std::cout << "HackRFDevice: Error: failed to stop tx mode!" << std::endl;
+            delete m_callback_args;
             g_pause_data_flow = false;
             return false;
         }
+        delete m_callback_args;
         m_device_mode = STANDBY_MODE;
         g_pause_data_flow = false;
         return true;
@@ -333,6 +339,7 @@ bool HackRFDevice::set_rx_gain( double rx_gain )
 
 bool HackRFDevice::set_tx_gain( double tx_gain )
 {
+    set_amp_enable( 1 );
     return set_txvga_gain( uint32_t(tx_gain) );
 }
 
@@ -362,12 +369,15 @@ bool HackRFDevice::set_txvga_gain( uint32_t txvga_gain )
         if ( txvga_gain >= 0 && txvga_gain <= 47 )
         {
             std::cout << "HackRFDevice: Setting Tx VGA gain: " << txvga_gain << std::endl;
+            g_pause_data_flow = true;
             if ( check_error( hackrf_set_txvga_gain( m_device, txvga_gain ) ) )
             {
                 m_txvga_gain = txvga_gain;
                 m_tx_gain = double(m_txvga_gain);
+                g_pause_data_flow = false;
                 return true;
             }
+            g_pause_data_flow = false;
         }
         else
             std::cout << "HackRFDevice: WARNING: invalid Tx VGA gain: " << txvga_gain << std::endl;
@@ -380,11 +390,14 @@ bool HackRFDevice::set_amp_enable( uint8_t amp_enable )
     if ( m_is_initialized )
     {
         std::cout << "HackRFDevice: Setting AMP enable: " << int(amp_enable) << std::endl;
+        g_pause_data_flow = true;
         if ( check_error( hackrf_set_amp_enable( m_device, amp_enable ) ) )
         {
             m_amp_enable = amp_enable;
+            g_pause_data_flow = false;
             return true;
         }
+        g_pause_data_flow = false;
     }
     return false;
 }

@@ -4,6 +4,7 @@
 #include "HackRFDevice.h"
 #include "packet.pb.h"
 #include "zhelpers.hpp"
+#include "waveforms.h"
 
 #include <signal.h>
 #include <stdio.h>
@@ -11,11 +12,14 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
-#include <vector>
+#include <deque>
+#include <complex>
+#include <mutex>
 
 // Device driver
 RFDevice* rf_device;
 std::string sdr_type;
+std::string sdr_tr_mode;
 Packet_Header_PacketType rx_mode = Packet_Header_PacketType_PDW;
 
 bool g_shutdown_requested = false;
@@ -27,10 +31,60 @@ void signal_handler(int s)
 }
 
 
+struct Tx_Context
+{
+    std::mutex waveform_mutex;
+    std::deque<std::complex<double>> waveform;
+    int64_t waveform_index;
+};
+Tx_Context g_tx_context;
+
+//
+// Callback function for tx samples
+//
+int sample_block_tx_cb_fn(SampleChunk* samples, void* args)
+{
+    Tx_Context* tx_ctx_ptr = (Tx_Context*)args;
+    
+    // Exit early if nothing to transmit
+    if (tx_ctx_ptr->waveform_index == -1)
+    {
+        //(*samples).resize(0);
+        std::cout << "." << std::flush;
+        return 0;
+    }
+    
+    // Wait for the waveform buffer to be released
+    //tx_ctx_ptr->waveform_mutex.lock();
+
+    //std::cout << "Waveform size: " << tx_ctx_ptr->waveform.size() << std::endl;
+
+    // Fill the sample buffer
+    for (std::size_t ii = 0; ii < samples->size(); ii++)
+    {
+        if (tx_ctx_ptr->waveform_index >= tx_ctx_ptr->waveform.size())
+        {
+            tx_ctx_ptr->waveform_index = -1;
+            break;
+        }
+        else
+        {
+            (*samples)[ii] = tx_ctx_ptr->waveform[tx_ctx_ptr->waveform_index];
+            tx_ctx_ptr->waveform_index++;
+        }
+    }
+    
+    std::cout << tx_ctx_ptr->waveform_index << std::endl;
+
+    //tx_ctx_ptr->waveform_mutex.unlock();
+
+    return 0;
+}
+
 //
 // Callback function for rx samples
 //
-int sample_block_cb_fn(SampleChunk* samples, void* args)
+int sample_block_rx_cb_fn(SampleChunk* samples, void* args)
 {
     // send the packet out over the network
     zmq::socket_t * publisher = (zmq::socket_t *)args;
@@ -108,7 +162,16 @@ void process_messages( zmq::socket_t* comm_sock )
 {
     while (!g_shutdown_requested)
     {
-        std::string message = s_recv( *comm_sock );
+        std::string message;
+        try
+        {
+            message = s_recv( *comm_sock );
+        }
+        catch(const zmq::error_t& e)
+        {
+            std::cerr << e.what() << '\n';
+            continue;
+        }
         
         std::cout << "sdr_server: Received: '" << message << "'" << std::endl;
 
@@ -213,6 +276,25 @@ void process_messages( zmq::socket_t* comm_sock )
             continue;
         }
 
+        if ( fields[0] == "set-tx-gain" && fields.size() >= 2 )
+        {
+            std::istringstream ss(fields[1]);
+            uint64_t new_tx_gain;
+            if (!(ss >> new_tx_gain))
+            {
+                std::cout << "sdr_server: set-tx-gain failed: '" << fields[1] << "'" << std::endl;
+                s_send( *comm_sock, std::string("ERROR: invalid tx gain argument") );
+            }
+            else if ( rf_device->set_tx_gain( new_tx_gain ) )
+            {
+                std::cout << "sdr_server: tx gain set to: " << new_tx_gain << std::endl;
+                s_send( *comm_sock, std::string("OK") );
+            }
+            else
+                s_send( *comm_sock, std::string("ERROR: set-tx-gain failed") );
+            continue;
+        }
+
         if ( fields[0] == "set-rx-mode" && fields.size() >= 2 )
         {
             std::istringstream ss(fields[1]);
@@ -242,6 +324,119 @@ void process_messages( zmq::socket_t* comm_sock )
             }
             continue;
         }
+
+        // set-waveform tone <pulse width s>
+        if ( fields[0] == "set-waveform" && fields.size() >= 2 )
+        {
+            if ( fields[1] == "tone" && fields.size() == 5 )
+            {
+                double pulse_width_s;
+                {
+                    std::istringstream ss(fields[2]);
+                    if (!(ss >> pulse_width_s))
+                    {
+                        std::cout << "sdr_server: set-waveform failed: '" << fields[2] << "'" << std::endl;
+                        s_send( *comm_sock, std::string("ERROR: invalid set-waveform tone argument") );
+                        continue;
+                    }
+                }
+
+                double mag;
+                {
+                    std::istringstream ss(fields[3]);
+                    if (!(ss >> mag))
+                    {
+                        std::cout << "sdr_server: set-waveform failed: '" << fields[3] << "'" << std::endl;
+                        s_send( *comm_sock, std::string("ERROR: invalid set-waveform chirp argument") );
+                        continue;
+                    }
+                }
+
+                int32_t tone_offset_hz;
+                {
+                    std::istringstream ss(fields[4]);
+                    if (!(ss >> tone_offset_hz))
+                    {
+                        std::cout << "sdr_server: set-waveform failed: '" << fields[4] << "'" << std::endl;
+                        s_send( *comm_sock, std::string("ERROR: invalid set-waveform tone argument") );
+                        continue;
+                    }
+                }
+                
+                // Wait for the waveform buffer to be released
+                g_tx_context.waveform_mutex.lock();
+                createTone(g_tx_context.waveform, rf_device->get_sample_rate(), tone_offset_hz, pulse_width_s, mag);
+                g_tx_context.waveform_index = 0;
+                g_tx_context.waveform_mutex.unlock();
+                s_send( *comm_sock, std::string("OK") );
+                continue;
+            }
+            else
+            {
+                s_send( *comm_sock, std::string("ERROR: invalid set-waveform tone arguments") );
+                continue;
+            }
+            
+            if ( fields[1] == "chirp" && fields.size() == 6 )
+            {
+                double pulse_width_s;
+                {
+                    std::istringstream ss(fields[2]);
+                    if (!(ss >> pulse_width_s))
+                    {
+                        std::cout << "sdr_server: set-waveform failed: '" << fields[2] << "'" << std::endl;
+                        s_send( *comm_sock, std::string("ERROR: invalid set-waveform chirp argument") );
+                        continue;
+                    }
+                }
+
+                double mag;
+                {
+                    std::istringstream ss(fields[3]);
+                    if (!(ss >> mag))
+                    {
+                        std::cout << "sdr_server: set-waveform failed: '" << fields[3] << "'" << std::endl;
+                        s_send( *comm_sock, std::string("ERROR: invalid set-waveform chirp argument") );
+                        continue;
+                    }
+                }
+
+                int32_t chirp_start_hz;
+                {
+                    std::istringstream ss(fields[4]);
+                    if (!(ss >> chirp_start_hz))
+                    {
+                        std::cout << "sdr_server: set-waveform failed: '" << fields[4] << "'" << std::endl;
+                        s_send( *comm_sock, std::string("ERROR: invalid set-waveform chirp argument") );
+                        continue;
+                    }
+                }
+                
+                int32_t chirp_width_hz;
+                {
+                    std::istringstream ss(fields[5]);
+                    if (!(ss >> chirp_width_hz))
+                    {
+                        std::cout << "sdr_server: set-waveform failed: '" << fields[5] << "'" << std::endl;
+                        s_send( *comm_sock, std::string("ERROR: invalid set-waveform chirp argument") );
+                        continue;
+                    }
+                }
+                
+                // Wait for the waveform buffer to be released
+                g_tx_context.waveform_mutex.lock();
+                createChirp(g_tx_context.waveform, rf_device->get_sample_rate(), chirp_start_hz, chirp_width_hz, pulse_width_s, mag);
+                g_tx_context.waveform_index = 0;
+                g_tx_context.waveform_mutex.unlock();
+                s_send( *comm_sock, std::string("OK") );
+                continue;
+            }
+            else
+            {
+                s_send( *comm_sock, std::string("ERROR: invalid set-waveform chirp arguments") );
+                continue;
+            }
+        }
     }
 }
 
@@ -257,7 +452,9 @@ void parse_args(int argc, char* argv[])
         if ( arg == "-h" || arg == "--help")
         {
             std::cout << "Usage: " << argv[0] << " -t <sdr type>" << std::endl;
-            std::cout << "    -t <SDR type>    hackrf or rtlsdr" << std::endl;
+            std::cout << "    [-t <SDR type>]    [hackrf] or rtlsdr" << std::endl;
+            std::cout << "    [-m <SDR mode>]    [rx] or tx" << std::endl;
+            exit(0);
         }
         else if ( arg == "-t" )
         {
@@ -277,12 +474,36 @@ void parse_args(int argc, char* argv[])
             
             aa += 1;
         }
+        else if ( arg == "-m" )
+        {
+            if (aa + 1 >= argc)
+            {
+                std::cout << "Missing mode!" << std::endl;
+                exit(1);
+            }
+            
+            // Type argument
+            std::istringstream ss(argv[aa+1]);
+            if (!(ss >> sdr_tr_mode))
+            {
+                std::cout << "ERROR: Invalid mode argument! '" << argv[aa+1] << "'" << std::endl;
+                exit(1);
+            }
+            
+            aa += 1;
+        }
     }
     
+    // Defaults
     if ( sdr_type != "hackrf" && sdr_type != "rtlsdr" )
     {
-        std::cout << "ERROR: no type specified!" << std::endl;
-        exit(2);
+        sdr_type = "hackrf";
+        std::cout << "INFO: no type specified, defaulting to " << sdr_type << std::endl;
+    }
+    if ( sdr_tr_mode != "rx" && sdr_tr_mode != "tx" )
+    {
+        sdr_tr_mode = "rx";
+        std::cout << "INFO: no mode specified, defaulting to " << sdr_tr_mode << std::endl;
     }
 }
 
@@ -322,14 +543,24 @@ int main(int argc, char* argv[])
     if ( rf_device->initialize() )
     {
         rf_device->set_sample_rate( 8000000 );
-        
-        // Start receiving data
-        rf_device->start_Rx( sample_block_cb_fn, (void*)(&publisher) );
-        
+        rf_device->set_tx_gain( 10 );
+
+        if ( sdr_tr_mode == "rx" )
+        {
+            // Start receiving data
+            rf_device->start_Rx( sample_block_rx_cb_fn, (void*)(&publisher) );
+        }
+        else
+        {
+            // Start transmitting data
+            rf_device->start_Tx( sample_block_tx_cb_fn, (void*)(&g_tx_context) );
+        }
+
         // Listen for messages, this blocks until a "quit" is received
         process_messages( &receiver );
 
         rf_device->stop_Rx();
+        rf_device->stop_Tx();
     }
 
     rf_device->cleanup();
