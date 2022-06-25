@@ -2,6 +2,7 @@
 #include "fft.h"
 #include "pulse_detector.h"
 #include "HackRFDevice.h"
+#include "RTLSDRDevice.h"
 #include "packet.pb.h"
 #include "zhelpers.hpp"
 #include "waveforms.h"
@@ -62,7 +63,7 @@ int sample_block_tx_cb_fn(SampleChunk* samples, void* args)
     // Fill the sample buffer
     for (std::size_t ii = 0; ii < samples->size(); ii++)
     {
-        if (tx_ctx_ptr->waveform_index >= tx_ctx_ptr->waveform.size())
+        if (tx_ctx_ptr->waveform_index >= int64_t(tx_ctx_ptr->waveform.size()))
         {
             tx_ctx_ptr->waveform_index = -1;
             break;
@@ -531,41 +532,52 @@ int main(int argc, char* argv[])
     zmq::socket_t receiver(recv_context, ZMQ_REP);
     receiver.bind("tcp://*:5556");
     
+    // Make the RF device
+    rf_device = nullptr;
     if ( sdr_type == "hackrf" )
     {
         rf_device = reinterpret_cast<RFDevice*>(new HackRFDevice);
     }
     if ( sdr_type == "rtlsdr" )
     {
-//        rf_device = reinterpret_cast<RFDevice*>(new RTLSDRDevice);
-    }
-
-    if ( rf_device->initialize() )
-    {
-        rf_device->set_sample_rate( 8000000 );
-        rf_device->set_tx_gain( 10 );
-
         if ( sdr_tr_mode == "rx" )
         {
-            // Start receiving data
-            rf_device->start_Rx( sample_block_rx_cb_fn, (void*)(&publisher) );
+            rf_device = reinterpret_cast<RFDevice*>(new RTLSDRDevice);
         }
         else
         {
-            // Start transmitting data
-            rf_device->start_Tx( sample_block_tx_cb_fn, (void*)(&g_tx_context) );
-        }
-
-        // Listen for messages, this blocks until a "quit" is received
-        process_messages( &receiver );
-
-        rf_device->stop_Rx();
-        rf_device->stop_Tx();
+            std::cout << "ERROR: RTLSDR only supports rx" << std::endl;
+        }   
     }
 
-    rf_device->cleanup();
-    delete rf_device;
-    
+    // If able to make a device
+    if ( rf_device != nullptr )
+    {
+        // Initialize
+        if ( rf_device->initialize() )
+        {
+            if ( sdr_tr_mode == "rx" )
+            {
+                // Start receiving data
+                rf_device->start_Rx( sample_block_rx_cb_fn, (void*)(&publisher) );
+            }
+            else
+            {
+                // Start transmitting data
+                rf_device->start_Tx( sample_block_tx_cb_fn, (void*)(&g_tx_context) );
+            }
+
+            // Listen for messages, this blocks until a "quit" is received
+            process_messages( &receiver );
+
+            rf_device->stop_Rx();
+            rf_device->stop_Tx();
+        }
+
+        rf_device->cleanup();
+        delete rf_device;
+    }
+
     return 0;
 }
 

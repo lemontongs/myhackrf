@@ -19,9 +19,9 @@ void signal_handler(int s)
 //
 // Callback function for Rx samples
 //
-void rx_cb_fn(unsigned char *buf, uint32_t len, void *ctx)
+int rx_callback(SampleChunk* samples, void* args)
 {
-    std::cout << "got a packet! (" << len << ")" << std::endl;
+    std::cout << "got samples! (" << samples->size() << ")" << std::endl;
 }
 
 //
@@ -39,7 +39,7 @@ int main()
     RTLSDRDevice rtlsdr;
     
     rtlsdr.initialize();
-    rtlsdr.start_Rx( rx_cb_fn );
+    rtlsdr.start_Rx( rx_callback, nullptr );
     
     sleep(1);
     

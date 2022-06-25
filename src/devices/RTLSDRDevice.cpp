@@ -9,7 +9,7 @@ RTLSDRDevice::RTLSDRDevice()
     m_device_mode    = STANDBY_MODE;    // mode: 0=standby 1=Rx 2=Tx
     m_fc_hz          = 462610000;       // center freq
     m_fs_hz          = 1000000;         // sample rate
-    m_lna_gain       = 0;
+    m_rx_gain        = 0;
 }
 
 RTLSDRDevice::~RTLSDRDevice()
@@ -38,9 +38,9 @@ bool RTLSDRDevice::initialize()
     //
     // Set device parameters
     //
-    if ( ! tune( m_fc_hz ) ||
+    if ( ! set_center_freq( m_fc_hz ) ||
          ! set_sample_rate( m_fs_hz ) ||
-         ! set_lna_gain( m_lna_gain ) )
+         ! set_rx_gain( m_rx_gain ) )
     {
         cleanup();
         return false;
@@ -48,6 +48,30 @@ bool RTLSDRDevice::initialize()
         
     m_is_initialized = true;
     return true;
+}
+
+//
+// Callback function for Rx samples
+//
+void rx_cb_fn(unsigned char *buf, uint32_t len, void *ctx)
+{
+    std::cout << "got a packet! (" << len << ")" << std::endl;
+    
+    std::pair<device_sample_block_cb_fn, void*>* callback_args_pair = (std::pair<device_sample_block_cb_fn, void*>*)ctx;
+
+    device_sample_block_cb_fn callback_function = callback_args_pair->first;
+    void* callback_args = callback_args_pair->second;
+
+    SampleChunk sc;
+    sc.resize(len);
+
+    for (int ii = 0; ii < len; ii+=2)
+    {
+        sc[ii] = std::complex<double>( ( double( int8_t( buf[ii+0] ) ) / double(128) ),
+                                       ( double( int8_t( buf[ii+1] ) ) / double(128) ) );
+    }
+
+    callback_function(&sc, callback_args);
 }
 
 void* thread_func(void* args)
@@ -63,7 +87,7 @@ void* thread_func(void* args)
     rtl_obj->check_error( 
         rtlsdr_read_async( 
             rtl_obj->m_device, 
-            rtl_obj->m_callback, 
+            rx_cb_fn,
             rtl_obj->m_callback_args, 
             0, 
             0 ) ); // Blocking
@@ -71,14 +95,13 @@ void* thread_func(void* args)
     return nullptr;
 }
 
-bool RTLSDRDevice::start_Rx( rtlsdr_read_async_cb_t callback, void* args )
+bool RTLSDRDevice::start_Rx( device_sample_block_cb_fn callback, void* args )
 {
     if ( m_is_initialized && m_device_mode == STANDBY_MODE )
     {
         std::cout << "Starting Rx thread " << m_is_initialized << std::endl;
         
-        m_callback_args = args;
-        m_callback = callback;
+        m_callback_args = new std::pair<device_sample_block_cb_fn, void*>(callback, args);
         
         pthread_create( &m_thread_context, NULL, thread_func, (void*)this );
         
@@ -95,16 +118,18 @@ bool RTLSDRDevice::stop_Rx()
         if ( ! check_error( rtlsdr_cancel_async( m_device ) ) )
         {
             std::cout << "Error: failed to stop rx mode!" << std::endl;
+            delete m_callback_args;
             return false;
         }
         pthread_join( m_thread_context, NULL );
         m_device_mode = STANDBY_MODE;
+        delete m_callback_args;
         return true;
     }
     return false;
 }
 
-bool RTLSDRDevice::tune( uint64_t fc_hz )
+bool RTLSDRDevice::set_center_freq( double fc_hz )
 {
     if ( m_is_initialized )
     {
@@ -125,7 +150,7 @@ bool RTLSDRDevice::tune( uint64_t fc_hz )
     return false;
 }
 
-bool RTLSDRDevice::set_sample_rate( uint32_t fs_hz )
+bool RTLSDRDevice::set_sample_rate( double fs_hz )
 {
     if ( m_is_initialized )
     {
@@ -135,7 +160,7 @@ bool RTLSDRDevice::set_sample_rate( uint32_t fs_hz )
              ( fs_hz > 900000 && fs_hz <= 3200000 ) )
         {
             std::cout << "Setting sample rate to " << fs_hz << std::endl;
-            if ( check_error( rtlsdr_set_sample_rate( m_device, fs_hz ) ) )
+            if ( check_error( rtlsdr_set_sample_rate( m_device, uint32_t(fs_hz) ) ) )
             {
                 m_fs_hz = fs_hz;
                 return true;
@@ -147,7 +172,7 @@ bool RTLSDRDevice::set_sample_rate( uint32_t fs_hz )
     return false;
 }
 
-bool RTLSDRDevice::set_lna_gain( uint32_t lna_gain )
+bool RTLSDRDevice::set_rx_gain( double lna_gain )
 {
     if ( m_is_initialized )
     {
