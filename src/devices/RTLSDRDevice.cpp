@@ -55,20 +55,18 @@ bool RTLSDRDevice::initialize()
 //
 void rx_cb_fn(unsigned char *buf, uint32_t len, void *ctx)
 {
-    std::cout << "got a packet! (" << len << ")" << std::endl;
-    
     std::pair<device_sample_block_cb_fn, void*>* callback_args_pair = (std::pair<device_sample_block_cb_fn, void*>*)ctx;
 
     device_sample_block_cb_fn callback_function = callback_args_pair->first;
     void* callback_args = callback_args_pair->second;
 
     SampleChunk sc;
-    sc.resize(len);
+    sc.resize(len/2);
 
-    for (int ii = 0; ii < len; ii+=2)
+    for (uint32_t ii = 0; ii < len; ii+=2)
     {
-        sc[ii] = std::complex<double>( ( double( int8_t( buf[ii+0] ) ) / double(128) ),
-                                       ( double( int8_t( buf[ii+1] ) ) / double(128) ) );
+        sc[ii/2] = std::complex<double>( ( double( buf[ii+0] ) - double(127.5) ) / double(127.5), 
+                                         ( double( buf[ii+1] ) - double(127.5) ) / double(127.5) );
     }
 
     callback_function(&sc, callback_args);
