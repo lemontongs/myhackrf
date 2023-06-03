@@ -30,9 +30,9 @@ int  HackRFDevice::get_mode()
     return m_device_mode;
 }
 
-bool HackRFDevice::initialize()
+bool HackRFDevice::initialize(const int desired_device_index)
 {
-    return initialize(nullptr);
+    return false;
 }
 
 bool HackRFDevice::initialize(const char* const desired_serial_number)

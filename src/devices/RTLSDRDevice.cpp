@@ -17,7 +17,18 @@ RTLSDRDevice::~RTLSDRDevice()
     cleanup();
 }
 
-bool RTLSDRDevice::initialize()
+bool RTLSDRDevice::initialize(const char* const desired_serial_number)
+{
+    int res = rtlsdr_get_index_by_serial(desired_serial_number);
+    if ( res < 0 )
+    {
+        std::cout << "Failed to open device with serial: '" << desired_serial_number << "'" << std::endl;
+        return false;
+    }
+    return initialize(res);
+}
+
+bool RTLSDRDevice::initialize(const int desired_device_index)
 {
     if ( 0 >= rtlsdr_get_device_count() )
     {
@@ -25,7 +36,7 @@ bool RTLSDRDevice::initialize()
         return false;
     }
 
-    if ( ! check_error( rtlsdr_open( &m_device, 0 ) ) )
+    if ( ! check_error( rtlsdr_open( &m_device, desired_device_index ) ) )
     {
         std::cout << "Failed to open device" << std::endl;
         return false;

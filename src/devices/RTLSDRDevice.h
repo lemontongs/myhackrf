@@ -15,7 +15,8 @@ public:
     RTLSDRDevice();
     ~RTLSDRDevice();
     
-    bool initialize();
+    bool initialize(const int desired_device_index);
+    bool initialize(const char* const desired_serial_number=nullptr);
     bool cleanup();
     
     bool start_Rx( device_sample_block_cb_fn callback, void* args );

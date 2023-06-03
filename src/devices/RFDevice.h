@@ -20,7 +20,8 @@ class RFDevice
 public:
     virtual ~RFDevice() = default;
     
-    virtual bool initialize() = 0;
+    virtual bool initialize(const int desired_device_index) = 0;
+    virtual bool initialize(const char* const desired_serial_number=nullptr) = 0;
     virtual bool cleanup() = 0;
 
     virtual bool start_Rx( device_sample_block_cb_fn callback, void* args ) = 0;
